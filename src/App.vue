@@ -91,6 +91,9 @@ async function search(limit: number = 1000, sort: string = "newest-first", custo
 }
 
 function selectMessage(id: string) {
+
+//  selectedMessageId.value = null; // Reset to trigger re-render
+
   selectedMessageId.value = id;
 }
 
@@ -189,8 +192,12 @@ onMounted(() => {
 
     <!-- Volet 3: Vue du Thread & Message -->
     <main class="flex-1 flex flex-col bg-white dark:bg-zinc-950 border-l border-gray-200 dark:border-zinc-800 overflow-hidden">
-      <div v-if="selectedMessageId" class="h-full overflow-hidden">
-        <MailDetail :message-id="selectedMessageId" />
+      <div v-if="selectedMessageId" 
+      class="h-full overflow-hidden">
+        <MailDetail 
+                :key="selectedMessageId"
+
+        :message-id="selectedMessageId" />
       </div>
       <div v-else class="h-full flex items-center justify-center text-gray-400 italic p-8 text-center">
         Double-click a thread to read its messages

@@ -44,3 +44,30 @@ export interface Draft {
   body: string;
   attachments: Attachment[];
 }
+
+
+export interface AttachmentDto {
+  partId: number;
+  filename: string;
+  contentType: string;
+  contentId: string | null;
+}
+
+export interface MessageDto {
+  id: string;
+  subject: string;
+  from: string;
+  to: string;
+  cc: string;
+  date: string;
+  timestamp: number;
+  htmlBody: string | null;
+  textBody: string | null;
+  inlineImages: AttachmentDto[];
+  attachments: AttachmentDto[];
+  replies: MessageDto[];
+}
+
+export interface ThreadDto {
+  roots: MessageDto[];
+}

@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import type { Message } from '../types'
+import type { Message,ThreadDto } from '../types'
+import ThreadView from './ThreadView.vue';
 
 const props = defineProps<{
   messageId: string
 }>()
 
-const message = ref<Message | null>(null)
+const message = ref<ThreadDto[] | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
 
@@ -15,7 +16,8 @@ async function fetchDetails() {
   loading.value = true
   error.value = null
   try {
-    const details = await invoke<Message>('get_message_details', { id: props.messageId })
+    const details = await invoke<ThreadDto[]>('get_message_details', { id: props.messageId })
+    console.error('Fetched details:', details)
     message.value = details
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
@@ -34,17 +36,7 @@ onMounted(() => {
     <div v-if="loading">Loading message...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <div v-else-if="message" class="content">
-      <div class="header">
-        <h1>{{ message.subject }}</h1>
-        <div class="meta">
-          <strong>From:</strong> {{ message.from }} <br>
-          <strong>Date:</strong> {{ message.date }}
-        </div>
-      </div>
-      <hr />
-      <div class="body">
-        <pre>{{ message.body }}</pre>
-      </div>
+      <ThreadView :threads="message" />
     </div>
     <div v-else>No message selected</div>
   </div>

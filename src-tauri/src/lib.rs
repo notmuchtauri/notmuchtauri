@@ -4,9 +4,11 @@
 mod notmuch;
 mod config;
 mod folder_scan;
-use notmuch::{NotMuchWrapper, Message, Messag, MessagElement};
+use notmuch::{NotMuchWrapper, Message};
 use config::{ConfigManager, AppConfig};
 use folder_scan::{FolderScanner, FolderNode};
+
+use crate::notmuch::ThreadDto;
 
 #[tauri::command]
 fn get_config() -> Result<AppConfig, String> {
@@ -45,14 +47,22 @@ fn search_messages(query: String, limit: Option<u32>, sort: Option<String>) -> R
 }
 
 #[tauri::command]
-fn get_message_details(id: String) -> Result<Message, String> {
-    NotMuchWrapper::get_message_details(&id).map_err(|e| e.to_string())
+fn get_message_details(id: String) -> Result<Vec<ThreadDto>, String> {
+    NotMuchWrapper::get_thread_details(&id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+ fn get_message_part(message_id: &str, part_id: u32) -> Result<String, String> {
+    NotMuchWrapper::get_message_part(&message_id, part_id).map_err(|e| e.to_string())
+
 }
 
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
+
+
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
