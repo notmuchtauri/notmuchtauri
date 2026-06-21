@@ -44,7 +44,10 @@ Ce fichier suit l'avancement du développement. Chaque tâche doit être validé
 - [ ] **Tâche 10 : Gestion des pièces jointes**
   - Parsing des attachments.
   - Ouverture des fichiers via l'OS.
+  - Inline pdf avec pdfjs dans une modal
 - [ ] **Tâche 11 : Polissage UX et optimisations**
   - Raccourcis clavier.
   - Mise en cache des recherches.
   - Design final.
+- [ ] **Tâche 12 : Transformer en ICS un message**
+- [ ] **Tâche 13 : Transformer en tâche un message**
