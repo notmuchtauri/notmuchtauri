@@ -24,9 +24,13 @@ Ce fichier suit l'avancement du développement. Chaque tâche doit être validé
 - [x] **Tâche 6 : Implémenter la gestion des tags**
   - Commande `toggle_tag` (appel à `notmuch tag`).
   - UI pour ajouter/supprimer des tags.
-- [ ] **Tâche 7 : Implémenter l'envoi de mail via `msmtp`**
-  - Interface de rédaction (Draft).
+- [x] **Tâche 7 : Implémenter l'envoi de mail via `msmtp`**
+  - Interface de rédaction (Draft).c
   - Construction du message RFC822 et pipe vers `msmtp`.
+  - [ ] Supporter les pièce jointe
+  - [ ] Supporter la completion dans les adresse mails
+  - [ ] Supporter le reply/replyall/forward (Modifier le composant pour pouvoir injecter les paramètre sous forme de props)
+  - [ ] Agrandir la largeur de la modal
 
 ## Phase 3 : Intelligence Artificielle (L' "Assistant")
 - [ ] **Tâche 8 : Configurer le client API Claude dans Rust**
