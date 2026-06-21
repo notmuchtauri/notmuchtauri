@@ -18,10 +18,10 @@ Ce fichier suit l'avancement du développement. Chaque tâche doit être validé
   - Affichage du corps du mail dans `MailDetail.vue`.
 
 ## Phase 2 : Interaction et Gestion (Le "Client Mail")
-- [ ] **Tâche 5 : Implémenter la vue Conversation/Thread**
+- [x] **Tâche 5 : Implémenter la vue Conversation/Thread**
   - Créer la commande Rust `get_thread`.
   - Interface de rendu chronologique des messages.
-- [ ] **Tâche 6 : Implémenter la gestion des tags**
+- [x] **Tâche 6 : Implémenter la gestion des tags**
   - Commande `toggle_tag` (appel à `notmuch tag`).
   - UI pour ajouter/supprimer des tags.
 - [ ] **Tâche 7 : Implémenter l'envoi de mail via `msmtp`**

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { Message, FolderNode, AppConfig } from "./types";
 import MailDetail from "./components/MailDetail.vue";
@@ -16,6 +16,52 @@ const currentPath = ref<string | null>(null);
 const rootPath = ref("");
 const folderTree = ref<FolderNode[]>([]);
 const isScanning = ref(false);
+
+const isMailRootExpanded = ref(false); // Collapsé par défaut
+
+
+// --- Logique de Redimensionnement (Splitters) ---
+const pane1Width = ref(256); // w-64 correspond à 256px
+const pane2Width = ref(512); // Largeur initiale pour la liste des messages
+const isDragging = ref<'pane1' | 'pane2' | null>(null);
+
+
+function startDrag(pane: 'pane1' | 'pane2') {
+  isDragging.value = pane;
+  document.addEventListener("mousemove", onDrag);
+  document.addEventListener("mouseup", stopDrag);
+  
+  // Amélioration UX : Change le curseur global et empêche la sélection de texte pendant le redimensionnement
+  document.body.style.cursor = "col-resize";
+  document.body.style.userSelect = "none";
+}
+
+function onDrag(e: MouseEvent) {
+  if (isDragging.value === 'pane1') {
+    // Largeur min 150px, max 500px pour le volet 1
+    const newWidth = Math.max(150, Math.min(e.clientX, 500));
+    pane1Width.value = newWidth;
+  } else if (isDragging.value === 'pane2') {
+    // La largeur du volet 2 dépend de la position de la souris moins la largeur du volet 1
+    const newWidth = Math.max(200, Math.min(e.clientX - pane1Width.value, 800));
+    pane2Width.value = newWidth;
+  }
+}
+
+function stopDrag() {
+  isDragging.value = null;
+  document.removeEventListener("mousemove", onDrag);
+  document.removeEventListener("mouseup", stopDrag);
+  
+  // Restaure le curseur normal
+  document.body.style.cursor = "";
+  document.body.style.userSelect = "";
+}
+
+onUnmounted(() => {
+  stopDrag(); // Nettoyage au cas où
+});
+
 
 async function initApp() {
   try {
@@ -111,7 +157,10 @@ onMounted(() => {
   <div class="flex h-screen w-screen overflow-hidden bg-gray-100 dark:bg-zinc-900 text-gray-900 dark:text-zinc-100">
 
     <!-- Volet 1: Navigation & Filtres -->
-    <aside class="w-64 flex-shrink-0 border-r border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 flex flex-col">
+    <aside class="flex-shrink-0 border-r border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 flex flex-col"
+      :style="{ width: pane1Width + 'px' }"
+    
+    >
       <!-- Search Section (NOW AT THE TOP) -->
       <div class="p-4 border-b border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
         <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Search</div>
@@ -126,25 +175,44 @@ onMounted(() => {
             Search
           </button>
         </div>
-      </div>
+      </div> 
 
       <!-- Folder Tree Section (NOW AT THE BOTTOM) -->
       <div class="flex-1 overflow-hidden flex flex-col">
-        <div class="p-3 bg-gray-50 dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800">
-           <div class="text-xs font-semibold text-gray-500 uppercase mb-2">Mail Root</div>
-           <div class="flex gap-2">
-             <input
-               v-model="rootPath"
-               @keyup.enter="scanFolders(rootPath)"
-               placeholder="/home/user/mail"
-               class="w-full px-2 py-1 text-xs border rounded bg-white dark:bg-zinc-800 border-gray-300 dark:border-zinc-700 outline-none"
-             />
-             <button @click="scanFolders(rootPath)" class="px-2 py-1 bg-gray-200 dark:bg-zinc-700 text-xs rounded hover:bg-gray-300 dark:hover:bg-zinc-600">
-               Scan
-             </button>
+<div class="bg-gray-50 dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800">
+           <!-- Header Cliquable -->
+           <button 
+             @click="isMailRootExpanded = !isMailRootExpanded"
+             class="w-full flex items-center justify-between p-3 focus:outline-none hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
+           >
+             <span class="text-xs font-semibold text-gray-500 uppercase">Mail Root</span>
+             <!-- Icône chevron animée -->
+             <svg 
+               class="w-4 h-4 text-gray-500 transform transition-transform duration-200"
+               :class="isMailRootExpanded ? 'rotate-180' : ''"
+               fill="none" stroke="currentColor" viewBox="0 0 24 24"
+             >
+               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+             </svg>
+           </button>
+           
+           <!-- Contenu collapsable -->
+           <div v-if="isMailRootExpanded" class="px-3 pb-3">
+             <div class="flex gap-2">
+               <input
+                 v-model="rootPath"
+                 placeholder="/home/user/mail"
+                 class="w-full px-2 py-1 text-xs border rounded bg-white dark:bg-zinc-800 border-gray-300 dark:border-zinc-700 outline-none focus:ring-1 focus:ring-blue-500"
+               />
+               <button 
+                 @click="scanFolders(rootPath)" 
+                 class="px-2 py-1 bg-gray-200 dark:bg-zinc-700 text-xs rounded hover:bg-gray-300 dark:hover:bg-zinc-600 transition-colors"
+               >
+                 Scan
+               </button>
+             </div>
            </div>
-        </div>
-        <div class="flex-1 overflow-y-auto">
+        </div>        <div class="flex-1 overflow-y-auto">
           <FolderTree
             :nodes="folderTree"
             :selected-path="currentPath"
@@ -156,9 +224,18 @@ onMounted(() => {
       </div>
     </aside>
 
+        <div 
+      class="w-1 bg-gray-200 dark:bg-zinc-800 hover:bg-blue-500 hover:w-1 cursor-col-resize z-10 transition-colors flex-shrink-0"
+      @mousedown="startDrag('pane1')"
+    ></div>
+
     <!-- Volet 2: Liste des Threads -->
-    <section class="flex-1 flex flex-col min-w-0 bg-white dark:bg-zinc-900">
-      <div class="p-3 border-b border-gray-200 dark:border-zinc-800 flex justify-between items-center bg-gray-50 dark:bg-zinc-900/50">
+    <section 
+    
+   class="flex-shrink-0 flex flex-col bg-white dark:bg-zinc-900"
+      :style="{ width: pane2Width + 'px' }"
+      >
+          <div class="p-3 border-b border-gray-200 dark:border-zinc-800 flex justify-between items-center bg-gray-50 dark:bg-zinc-900/50">
         <span class="text-sm font-medium">{{ messages.length }} results found</span>
         <div class="flex gap-2">
           <button class="text-xs px-2 py-1 border rounded hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors">Select All</button>
@@ -189,9 +266,14 @@ onMounted(() => {
         </div>
       </div>
     </section>
+        <!-- Splitter 2 -->
+    <div 
+      class="w-1 bg-gray-200 dark:bg-zinc-800 hover:bg-blue-500 hover:w-1 cursor-col-resize z-10 transition-colors flex-shrink-0"
+      @mousedown="startDrag('pane2')"
+    ></div>
 
     <!-- Volet 3: Vue du Thread & Message -->
-    <main class="flex-1 flex flex-col bg-white dark:bg-zinc-950 border-l border-gray-200 dark:border-zinc-800 overflow-hidden">
+    <main class="flex-1 min-w-[75] flex flex-col bg-white dark:bg-zinc-950 border-l border-gray-200 dark:border-zinc-800 overflow-hidden">
       <div v-if="selectedMessageId" 
       class="h-full overflow-hidden">
         <MailDetail 
