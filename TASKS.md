@@ -27,10 +27,10 @@ Ce fichier suit l'avancement du développement. Chaque tâche doit être validé
 - [x] **Tâche 7 : Implémenter l'envoi de mail via `msmtp`**
   - Interface de rédaction (Draft).c
   - Construction du message RFC822 et pipe vers `msmtp`.
-  - [ ] Supporter les pièce jointe
-  - [ ] Supporter la completion dans les adresse mails
-  - [ ] Supporter le reply/replyall/forward (Modifier le composant pour pouvoir injecter les paramètre sous forme de props)
-  - [ ] Agrandir la largeur de la modal
+  - [x] Supporter les pièce jointe
+  - [X] Supporter la completion dans les adresse mails
+  - [x] Supporter le reply/replyall/forward (Modifier le composant pour pouvoir injecter les paramètre sous forme de props)
+  - [x] Agrandir la largeur de la modal
 
 ## Phase 3 : Intelligence Artificielle (L' "Assistant")
 - [ ] **Tâche 8 : Configurer le client API Claude dans Rust**
@@ -47,8 +47,6 @@ Ce fichier suit l'avancement du développement. Chaque tâche doit être validé
   - Inline pdf avec pdfjs dans une modal
 - [ ] **Tâche 11 : Polissage UX et optimisations**
   - Raccourcis clavier.
-  - Mise en cache des recherches.
   - Design final.
 - [ ] **Tâche 12 : Transformer en ICS un message**
 - [ ] **Tâche 13 : Transformer en tâche un message**
-- [ ] **Tâche 14 : Completion adresse mail par nombre de message**
