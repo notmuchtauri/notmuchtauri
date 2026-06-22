@@ -187,7 +187,7 @@ const emit = defineEmits<{
   (e: 'close', id: string): void
   (e: 'sent', id: string): void
 }>()
-
+const isSearching = ref<Record<string, boolean>>({ to: false, cc: false, bcc: false });
 const recipients = ref<Record<string, AddressMatch[]>>({ to: [], cc: [], bcc: [] });
 const queries = ref<Record<string, string>>({ to: '', cc: '', bcc: '' });
 const suggestions = ref<Record<string, AddressMatch[]>>({ to: [], cc: [], bcc: [] });
@@ -202,15 +202,23 @@ function getDropdownStyle(field: string) {
   return { top: '100%', left: '0px', zIndex: '1000' };
 }
 
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 async function onInputChanged(field: 'to' | 'cc' | 'bcc') {
   const q = queries.value[field];
+   if (debounceTimer) clearTimeout(debounceTimer);
   if (q.length < 5) {
     suggestions.value[field] = [];
     return;
   }
+   isSearching.value[field] = true; // Show loading state immediately
+    debounceTimer = setTimeout(async () => {
   const results = await invoke<AddressMatch[]>('lookup_address', { query: q, limit:20 });
-  suggestions.value[field] = results;
-  highlightedIndex.value[field] = 0;
+  if (queries.value[field] === q) {
+      suggestions.value[field] = results;
+      highlightedIndex.value[field] = 0;
+    }
+    isSearching.value[field] = false; // Hide loading state
+  }, 150);
 }
 
 function selectAddress(field: 'to' | 'cc' | 'bcc', addr: AddressMatch) {
