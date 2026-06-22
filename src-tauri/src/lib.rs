@@ -7,7 +7,7 @@ mod notmuch;
 mod msmtp;
 use config::{AppConfig, ConfigManager};
 use folder_scan::{FolderNode, FolderScanner};
-use notmuch::{Message, NotMuchWrapper};
+use notmuch::{Message, NotMuchWrapper,ReplyData,AddressMatch};
 use msmtp::{EmailPayload, MSMTPWrapper};
 
 use crate::notmuch::ThreadDto;
@@ -81,6 +81,21 @@ async fn send_email(payload: EmailPayload) -> Result<(), String> {
 }
 
 
+#[tauri::command]
+fn get_reply_data(message_id: String, reply_mode: String, message:Message) -> Result<ReplyData, String> {
+    NotMuchWrapper::get_reply_data(message_id, reply_mode,message).map_err(|e| e.to_string())
+} 
+#[tauri::command]
+fn lookup_address(query: String, limit: usize) -> Result<Vec<AddressMatch>, String> {
+    NotMuchWrapper::lookup_address_limited(&query, limit)
+        .map_err(|e| e.to_string())
+}
+/* 
+     fn lookup_address(query: &str) -> Result<Vec<AddressMatch>, String> {
+    NotMuchWrapper::lookup_address(query).map_err(|e| e.to_string())
+
+     }*/
+
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -102,7 +117,9 @@ pub fn run() {
             get_message_part,
             save_message_part,
             modify_message_tag,
-            send_email
+            send_email,
+            get_reply_data, 
+            lookup_address
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

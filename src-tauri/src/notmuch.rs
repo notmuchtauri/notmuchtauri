@@ -3,9 +3,15 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::error::Error;
 use std::fs;
-use std::process::Command;
+use std::io::{BufRead, BufReader};
+use std::process::{Command, Stdio};
 
 // --- RAW NOTMUCH MODELS ---
+#[derive(Serialize, Deserialize)]
+pub struct AddressMatch {
+    pub name: String,
+    pub email: String,
+}
 
 /// Representation of a single result from `notmuch show --format=json`.
 
@@ -29,7 +35,7 @@ pub struct MessageDto {
     pub cc: String,
     pub date: String,
     pub timestamp: u64,
-    pub tags: Vec<String>, 
+    pub tags: Vec<String>,
 
     // Le contenu
     pub html_body: Option<String>,
@@ -131,6 +137,16 @@ pub struct Message {
     pub tags: Vec<String>,
     pub is_read: bool,
     pub has_attachments: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplyData {
+    pub to: String,
+    pub cc: String,
+    pub subject: String,
+    pub body: String,
+    pub bodyhtml: String,
 }
 
 pub struct NotMuchWrapper;
@@ -282,39 +298,233 @@ impl NotMuchWrapper {
         }
     }
 
-pub fn modify_message_tag(message_id: &str, tag: &str, action: &str) -> Result<(), String> {
+    pub fn modify_message_tag(message_id: &str, tag: &str, action: &str) -> Result<(), String> {
+        println!(
+            "Modifying tag '{}' for message ID '{}' with action '{}'",
+            tag, message_id, action
+        );
 
-    println!("Modifying tag '{}' for message ID '{}' with action '{}'", tag, message_id, action);
+        // action doit être "add" ou "remove"
+        let prefix = match action {
+            "add" => "+",
+            "remove" => "-",
+            _ => return Err("Action invalide, utilisez 'add' ou 'remove'".to_string()),
+        };
 
-    
-    // action doit être "add" ou "remove"
-    let prefix = match action {
-        "add" => "+",
-        "remove" => "-",
-        _ => return Err("Action invalide, utilisez 'add' ou 'remove'".to_string()),
-    };
+        let tag_arg = format!("{}{}", prefix, tag);
+        let id_arg = format!("id:{}", message_id);
 
-    let tag_arg = format!("{}{}", prefix, tag);
-    let id_arg = format!("id:{}", message_id);
+        // On exécute: notmuch tag +tag_name -- id:message_id
+        // Le "--" sécurise la commande au cas où le tag ou l'ID commence par un tiret
 
-    // On exécute: notmuch tag +tag_name -- id:message_id
-    // Le "--" sécurise la commande au cas où le tag ou l'ID commence par un tiret
+        let output = Command::new("notmuch")
+            .args(["tag", &tag_arg, "--", &id_arg])
+            .output()
+            .map_err(|e| format!("Erreur d'exécution notmuch: {}", e))?;
 
-    let output = Command::new("notmuch")
-        .args(["tag", &tag_arg, "--", &id_arg])
-        .output()
-        .map_err(|e| format!("Erreur d'exécution notmuch: {}", e))?;
+        if output.status.success() {
+            Ok(())
+        } else {
+            let err = String::from_utf8_lossy(&output.stderr).into_owned();
+            Err(format!("Erreur notmuch: {}", err))
+        }
+    }
 
-    if output.status.success() {
-        Ok(())
-    } else {
-        let err = String::from_utf8_lossy(&output.stderr).into_owned();
-        Err(format!("Erreur notmuch: {}", err))
+    pub fn get_reply_data(
+        message_id: String,
+        reply_mode: String,
+        messagehtml: Message,
+    ) -> Result<ReplyData, String> {
+        // Choix de l'argument reply-to (all ou sender)
+        let reply_to_arg = match reply_mode.as_str() {
+            "reply" => "--reply-to=sender",
+            "reply-all" => "--reply-to=all",
+            // Pour forward, on utilise reply mais on videra les destinataires
+            "forward" => "--reply-to=sender",
+            _ => "--reply-to=all",
+        };
+
+        // Appel à notmuch reply (assure-toi que notmuch est dans le PATH)
+        let output = Command::new("notmuch")
+            .args([
+                "reply",
+                "--format=json",
+                reply_to_arg,
+                &format!("id:{}", message_id),
+            ])
+            .output()
+            .map_err(|e| format!("Erreur d'exécution de notmuch: {}", e))?;
+
+        if !output.status.success() {
+            return Err("La commande notmuch reply a échoué".into());
+        }
+
+        let json_str = String::from_utf8_lossy(&output.stdout);
+
+        // Parsage grossier du JSON renvoyé par notmuch
+        // notmuch renvoie un objet JSON avec { "reply-headers": { "Subject": "...", "To": "...", "Cc": "..." }, "original": { ... } }
+        let parsed: serde_json::Value = serde_json::from_str(&json_str)
+            .map_err(|e| format!("Erreur de parsing JSON: {}", e))?;
+
+        let headers = &parsed["reply-headers"];
+
+        let mut to = headers["To"].as_str().unwrap_or("").to_string();
+        let mut cc = headers["Cc"].as_str().unwrap_or("").to_string();
+        let mut subject = headers["Subject"].as_str().unwrap_or("").to_string();
+
+        // Comportement spécifique pour "forward"
+        if reply_mode == "forward" {
+            to = String::new();
+            cc = String::new();
+            if subject.starts_with("Re:") {
+                subject = subject.replacen("Re:", "Fwd:", 1);
+            } else if !subject.starts_with("Fwd:") {
+                subject = format!("Fwd: {}", subject);
+            }
+        }
+
+        // Récupération de la version textuelle générée par default de notmuch
+        // Alternative: tu peux utiliser "notmuch reply --format=default" pour récupérer le texte pur directement
+        // ou reconstruire un beau body toi-même à partir de "original".
+        // Pour l'exemple, on va appeler une 2e fois sans format=json pour obtenir le texte cité pré-généré :
+        let body_output = Command::new("notmuch")
+            .args(["reply", reply_to_arg, &format!("id:{}", message_id)])
+            .output()
+            .map_err(|e| e.to_string())?;
+
+        let full_text = String::from_utf8_lossy(&body_output.stdout);
+
+        // notmuch reply default sort les headers puis un saut de ligne vide puis le body.
+        // On extrait juste le body (après la première double ligne vide).
+        let body = full_text.splitn(2, "\n\n").nth(1).unwrap_or("").to_string();
+        let mut bodyhtml: String = String::from("");
+        if messagehtml.id != "-1" {
+            bodyhtml = prepare_reply_body(&messagehtml); // Simple wrapping, tu peux améliorer ça pour du HTML plus joli
+        }
+
+        Ok(ReplyData {
+            to,
+            cc,
+            subject,
+            body,
+            bodyhtml,
+        })
+    }
+
+     pub fn lookup_address(query: &str) -> Result<Vec<AddressMatch>, Box<dyn Error>> {
+          // notmuch-addrlookup doesn't always have a --format=json,
+          // so we execute it and parse the lines.
+          let output = Command::new("notmuch-addrlookup")
+              .arg(query)
+              .output()?;
+
+          if !output.status.success() {
+              return Ok(vec![]); // Return empty if no matches or error
+          }
+
+          let stdout = String::from_utf8_lossy(&output.stdout);
+          let mut matches = Vec::new();
+
+          for line in stdout.lines() {
+              // notmuch-addrlookup typically returns "Name <email>" or just "email"
+              // We can use a regex or simple splitting to clean this up
+              let parts: Vec<&str> = line.splitn(2, " <").collect();
+              if parts.len() == 2 {
+                  let name = parts[0].to_string();
+                  let email = parts[1].trim_end_matches('>').to_string();
+                  matches.push(AddressMatch { name, email });
+              } else {
+                  matches.push(AddressMatch {
+                      name: line.to_string(),
+                      email: line.to_string()
+                  });
+              }
+          }
+          Ok(matches)
+      }
+
+        /// Performs a lookup with a hard limit on the number of processed lines
+    pub fn lookup_address_limited(query: &str, line_limit: usize) -> Result<Vec<AddressMatch>, Box<dyn Error>> {
+        // 1. Spawn the process and pipe stdout
+        let mut child = Command::new("notmuch-addrlookup")
+            .arg(query)
+            .stdout(Stdio::piped()) // Capture stdout via pipe
+            .spawn()?;
+
+        // 2. Create a buffered reader from the stdout handle
+        let stdout_handle = child.stdout.take().ok_or("Failed to open stdout")?;
+        let reader = BufReader::new(stdout_handle);
+
+        let mut matches = Vec::new();
+        let mut lines_processed = 0;
+
+        // 3. Iterate through lines until we hit the limit or the stream ends
+        for line_result in reader.lines() {
+            if lines_processed >= line_limit {
+                break; // Stop reading after n lines
+            }
+
+            let line = line_result?;
+            if line.trim().is_empty() { continue; }
+
+            // Parse the line into AddressMatch
+            if let Some(addr) = Self::parse_addr_line(&line) {
+                matches.push(addr);
+            }
+
+            lines_processed += 1;
+        }
+
+        // 4. Kill the child process to prevent it from continuing to run in background
+        // since we stopped reading the pipe, the process might hang or continue.
+        let _ = child.kill();
+
+        Ok(matches)
+    }
+
+    /// Helper to parse the notmuch-addrlookup format: "Name <email>" or "email"
+    fn parse_addr_line(line: &str) -> Option<AddressMatch> {
+        if let Some(start_bracket) = line.find('<') {
+            if let Some(end_bracket) = line.rfind('>') {
+                let name = line[..start_bracket].trim().to_string();
+                let email = line[start_bracket + 1..end_bracket].to_string();
+                return Some(AddressMatch { name, email });
+            }
+        }
+        // Fallback if no brackets are found (just the email)
+        Some(AddressMatch {
+            name: line.trim().to_string(),
+            email: line.trim().to_string()
+        })
     }
 }
 
+pub fn prepare_reply_body(original_message: &Message) -> String {
+    let from_display = &original_message.from;
+    let to_display = &original_message.to;
+    let date_display = &original_message.date;
+    let subject_display = &original_message.subject;
 
+    // We determine the best available content from the original message
+    // This assumes the Message struct already contains the "best" body (HTML or Plain)
+    let body_content = &original_message.body;
 
+    // We wrap the original content in a styled HTML block
+    // Using a simple but clean style that works across most email clients
+    format!(
+        r#"<div data-marker="__HEADERS__">
+            <blockquote style="border-left:2px solid #1010FF;margin-left:5px;padding-left:5px;color:#000;font-weight:normal;font-style:normal;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-size:12pt;">
+            <b>De: </b> {} <br>
+            <b>À: </b> {} </br>
+            <b>Envoyé: </b>{}<br>
+            <b>Objet: </b>{}<br></blockquote></div>
+            <div data-marker="__QUOTED_TEXT__">
+            <blockquote style="border-left:2px solid #1010FF;margin-left:5px;padding-left:5px;color:#000;font-weight:normal;font-style:normal;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-size:12pt;">
+            {}
+            </blockquote></div>
+            "#,
+        from_display, to_display, date_display, subject_display, body_content
+    )
 }
 
 /// Convertit le JSON brut de Notmuch en une liste de ThreadDto prêts pour Tauri/Vue

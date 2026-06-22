@@ -70,6 +70,12 @@ export interface MessageDto {
 
 }
 
+export interface AddressMatch {
+     name: string,
+     email: string,
+}
+
+
 export interface ThreadDto {
   roots: MessageDto[];
 }

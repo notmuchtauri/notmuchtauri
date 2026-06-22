@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, onMounted, onUnmounted, provide } from "vue";
 import { invoke } from "@tauri-apps/api/core";
-import type { Message, FolderNode, AppConfig } from "./types";
+import type { Message, FolderNode, AppConfig, MessageDto } from "./types";
 import MailDetail from "./components/MailDetail.vue";
 import FolderTree from "./components/FolderTree.vue";
-import ComposeEmailModal from "./components/ComposeEmailModal.vue";
+import ComposeView from './components/ComposeView.vue';
 
 const searchQuery = ref("");
 const messages = ref<Message[]>([]);
@@ -141,7 +141,9 @@ function selectMessage(id: string) {
 //  selectedMessageId.value = null; // Reset to trigger re-render
 
   selectedMessageId.value = id;
+  openThread(id);
 }
+
 
 function onFolderSelected(path: string) {
   currentPath.value = path;
@@ -159,6 +161,86 @@ function removetag(messageId: string) {
     }
   });
 }
+
+interface Tab {
+  id: string;
+  type: 'VIEW' | 'COMPOSE';
+  replyMode: 'reply' | 'reply-all' | 'forward' |'new'|'none';
+  title: string;
+  threadId?: string; // For VIEW
+  originalMessageId?: string; // For COMPOSE (to know who we are replying to)
+  isHtml:boolean,
+  message: MessageDto|null
+}
+
+const openTabs = ref<Tab[]>([]);
+const activeTabId = ref<string | null>(null);
+
+function openThread(id: string) {
+  // Check if already open
+  const existing = openTabs.value.find(t => t.type === 'VIEW' && t.threadId === id);
+  if (existing) {
+    activeTabId.value = existing.id;
+    return;
+  }
+
+  const newId = crypto.randomUUID();
+  openTabs.value.push({
+    id: newId,
+    type: 'VIEW',
+    replyMode: 'none',
+    title: `Thread ${id.substring(0, 8)}`,
+    threadId: id,
+    isHtml:true,
+    message:null
+  });
+  activeTabId.value = newId;
+}
+
+    
+
+const openReply = (message: MessageDto,  subject: string, replyMode: 'reply' | 'reply-all' | 'forward' |'new'|'none'
+)=>{
+  console.error("Opening reply for messageId:", message.id, "with subject:", subject, "and mode:", replyMode);
+  const newId = crypto.randomUUID();
+  openTabs.value.push({
+    id: newId,
+    type: 'COMPOSE',
+    replyMode,
+    title: replyMode ==='reply'? 'reply':replyMode ==='reply-all'? 'reply-all': 'forward' +   `: ${subject}`,
+    originalMessageId: message.id,
+    isHtml: message.htmlBody!== null && message.htmlBody!== '',
+    message:message
+  });
+  activeTabId.value = newId;
+}
+provide(/* key */ 'replyFunction', /* value */ openReply)
+
+
+function openTabsNew() {
+  const newId = crypto.randomUUID();
+  openTabs.value.push({
+    id: newId,
+    replyMode:'new',
+    type: 'COMPOSE',
+    title: `Nouveau message`,
+    originalMessageId: '',
+    isHtml:true,
+    message:null
+
+  });
+  activeTabId.value = newId;
+}
+
+
+const closeTab = (id: string) :void => {
+  console.error("Closing tab with id:", id);
+  openTabs.value = openTabs.value.filter(t => t.id !== id);
+  if (activeTabId.value === id) {
+    activeTabId.value = openTabs.value.length ? openTabs.value[0].id : null;
+  }
+}
+
 </script>
 
 <template>
@@ -221,7 +303,21 @@ function removetag(messageId: string) {
              </div>
            </div>
         </div>      
-        <ComposeEmailModal/>
+       <!-- <ComposeEmailModal/>-->
+        
+<div>
+    <button 
+      @click="openTabsNew" 
+      class="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+        <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
+        <path fill-rule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clip-rule="evenodd" />
+      </svg>
+      Nouveau message
+    </button>
+</div>
+
         <div class="flex-1 overflow-y-auto">
           <FolderTree
             :nodes="folderTree"
@@ -289,7 +385,46 @@ function removetag(messageId: string) {
 
     <!-- Volet 3: Vue du Thread & Message -->
     <main class="flex-1 min-w-[75] flex flex-col bg-white dark:bg-zinc-950 border-l border-gray-200 dark:border-zinc-800 overflow-hidden">
-      <div v-if="selectedMessageId" 
+
+  <!-- Tab Bar -->
+  <div v-if="openTabs.length" class="flex overflow-x-auto bg-gray-100 dark:bg-zinc-900 border-b border-gray-200 dark:border-zinc-800">
+    <div
+      v-for="tab in openTabs"
+      :key="tab.id"
+      @click="activeTabId = tab.id"
+      :class="['flex items-center px-3 py-2 text-xs cursor-pointer border-r border-gray-200 dark:border-zinc-800 transition-colors min-w-fit',
+               activeTabId === tab.id ? 'bg-white dark:bg-zinc-950 text-blue-600' : 'text-gray-500 hover:bg-gray-200 dark:hover:bg-zinc-800']"
+    >
+      <span class="truncate max-w-[150px]">{{ tab.title }}</span>
+      <button @click.stop="closeTab(tab.id)" class="ml-2 hover:text-red-500">×</button>
+    </div>
+  </div>
+
+  <!-- Content Area -->
+  <div class="flex-1 overflow-hidden">
+    <template v-if="activeTabId">
+     
+     
+      <div v-for="tab in openTabs.filter(t => t.id === activeTabId)" :key="tab.id" class="h-full">
+    <!-- <div v-if="selectedMessageId" 
+      class="h-full overflow-hidden">
+      <MailDetail  
+          @mark-as-read="removetag"
+                :key="selectedMessageId"
+
+        :message-id="selectedMessageId" />
+        </div>-->
+      
+      <MailDetail v-if="tab.type === 'VIEW'" :message-id="tab.threadId!" />
+      <ComposeView v-else  @close="closeTab" :message="tab.message"  :reply-mode="tab.replyMode" :isHtml="tab.isHtml"  :message-id="tab.originalMessageId!" :tabs-id="tab.id"    />
+      </div>
+    </template>
+    <div v-else class="h-full flex items-center justify-center text-gray-400 italic p-8 text-center">
+      Double-click a thread to read its messages
+    </div>
+  </div>
+
+    <!--  <div v-if="selectedMessageId" 
       class="h-full overflow-hidden">
         <MailDetail  
           @mark-as-read="removetag"
@@ -299,7 +434,7 @@ function removetag(messageId: string) {
       </div>
       <div v-else class="h-full flex items-center justify-center text-gray-400 italic p-8 text-center">
         Double-click a thread to read its messages
-      </div>
+      </div>-->
     </main>
   </div>
 </template>
