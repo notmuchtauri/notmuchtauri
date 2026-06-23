@@ -411,40 +411,41 @@ impl NotMuchWrapper {
         })
     }
 
-     pub fn lookup_address(query: &str) -> Result<Vec<AddressMatch>, Box<dyn Error>> {
-          // notmuch-addrlookup doesn't always have a --format=json,
-          // so we execute it and parse the lines.
-          let output = Command::new("notmuch-addrlookup")
-              .arg(query)
-              .output()?;
+    pub fn lookup_address(query: &str) -> Result<Vec<AddressMatch>, Box<dyn Error>> {
+        // notmuch-addrlookup doesn't always have a --format=json,
+        // so we execute it and parse the lines.
+        let output = Command::new("notmuch-addrlookup").arg(query).output()?;
 
-          if !output.status.success() {
-              return Ok(vec![]); // Return empty if no matches or error
-          }
+        if !output.status.success() {
+            return Ok(vec![]); // Return empty if no matches or error
+        }
 
-          let stdout = String::from_utf8_lossy(&output.stdout);
-          let mut matches = Vec::new();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let mut matches = Vec::new();
 
-          for line in stdout.lines() {
-              // notmuch-addrlookup typically returns "Name <email>" or just "email"
-              // We can use a regex or simple splitting to clean this up
-              let parts: Vec<&str> = line.splitn(2, " <").collect();
-              if parts.len() == 2 {
-                  let name = parts[0].to_string();
-                  let email = parts[1].trim_end_matches('>').to_string();
-                  matches.push(AddressMatch { name, email });
-              } else {
-                  matches.push(AddressMatch {
-                      name: line.to_string(),
-                      email: line.to_string()
-                  });
-              }
-          }
-          Ok(matches)
-      }
+        for line in stdout.lines() {
+            // notmuch-addrlookup typically returns "Name <email>" or just "email"
+            // We can use a regex or simple splitting to clean this up
+            let parts: Vec<&str> = line.splitn(2, " <").collect();
+            if parts.len() == 2 {
+                let name = parts[0].to_string();
+                let email = parts[1].trim_end_matches('>').to_string();
+                matches.push(AddressMatch { name, email });
+            } else {
+                matches.push(AddressMatch {
+                    name: line.to_string(),
+                    email: line.to_string(),
+                });
+            }
+        }
+        Ok(matches)
+    }
 
-        /// Performs a lookup with a hard limit on the number of processed lines
-    pub fn lookup_address_limited(query: &str, line_limit: usize) -> Result<Vec<AddressMatch>, Box<dyn Error>> {
+    /// Performs a lookup with a hard limit on the number of processed lines
+    pub fn lookup_address_limited(
+        query: &str,
+        line_limit: usize,
+    ) -> Result<Vec<AddressMatch>, Box<dyn Error>> {
         // 1. Spawn the process and pipe stdout
         let mut child = Command::new("notmuch-addrlookup")
             .arg(query)
@@ -465,7 +466,9 @@ impl NotMuchWrapper {
             }
 
             let line = line_result?;
-            if line.trim().is_empty() { continue; }
+            if line.trim().is_empty() {
+                continue;
+            }
 
             // Parse the line into AddressMatch
             if let Some(addr) = Self::parse_addr_line(&line) {
@@ -494,7 +497,7 @@ impl NotMuchWrapper {
         // Fallback if no brackets are found (just the email)
         Some(AddressMatch {
             name: line.trim().to_string(),
-            email: line.trim().to_string()
+            email: line.trim().to_string(),
         })
     }
 }

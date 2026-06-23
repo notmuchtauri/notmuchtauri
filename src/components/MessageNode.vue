@@ -432,14 +432,6 @@ const toggleTodo = () => {
   }
 }
 
-const promptCustomTag = () => {
-  // Utilisation de prompt() natif pour la simplicité. 
-  // Vous pourrez le remplacer par un modal personnalisé plus tard.
-  const newTag = prompt('Entrez le nom du tag à ajouter :')
-  if (newTag) {
-    handleAddTag(newTag)
-  }
-}
 // --- État de la modale d'ajout de tag ---
 const isTagModalOpen = ref(false)
 const newTagValue = ref('')
@@ -492,9 +484,17 @@ onMounted(async () => {
 
 
   // Si le message n'a pas d'images inline ou pas de HTML, on s'arrête là
-  if (!props.message.htmlBody || props.message.inlineImages.length === 0) return
+  if (!props.message.htmlBody ) return
 
   let tempHtml = props.message.htmlBody
+  tempHtml =enforceTargetBlank(tempHtml);
+
+  if ( props.message.inlineImages.length === 0)
+  {
+    processedHtml.value = tempHtml;
+    return;
+
+  }
 
   for (const img of props.message.inlineImages) {
     if (!img.contentId) continue
@@ -531,6 +531,36 @@ onMounted(async () => {
   processedHtml.value = tempHtml;
 })
 
+
+/**
+ * Analyse une chaîne HTML, trouve tous les liens <a href="..."> 
+ * et s'assure qu'ils ont target="_blank" et rel="noopener noreferrer"
+ */
+function enforceTargetBlank(htmlString: string): string {
+  if (!htmlString) return '';
+
+  // 1. Convertir la chaîne en un objet DOM virtuel
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(htmlString, 'text/html');
+
+  // 2. Récupérer toutes les balises <a>
+  const links = doc.querySelectorAll('a');
+
+  // 3. Boucler sur chaque lien
+  links.forEach(link => {
+    // On s'assure que c'est un vrai lien avec un href (certaines balises <a> sont juste des ancres internes)
+    if (link.hasAttribute('href')) {
+      // Force l'ouverture dans une nouvelle fenêtre/le navigateur par défaut
+      link.setAttribute('target', '_blank');
+      
+      // TRÈS IMPORTANT pour la sécurité : empêche le site de destination 
+      // d'exécuter du JS dans la fenêtre de votre application Tauri
+      link.setAttribute('rel', 'noopener noreferrer');
+    }
+  });
+  // 4. Retourner le HTML modifié (on prend le contenu du body)
+  return doc.body.innerHTML;
+}
 
 // Formater la date proprement
 const formattedDate = computed(() => {

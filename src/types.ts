@@ -17,9 +17,19 @@ export interface FolderNode {
   children: FolderNode[];
 }
 
+export interface AccountConfig{
+  id:string,
+  label: string,
+  email: string,
+  sent_folder?:string
+}
+
 export interface AppConfig {
   root_mail_dir: string;
   default_path: string;
+  limit:number,
+  accounts: AccountConfig[]
+  default_sent_folder:string
 }
 
 export interface Thread {
@@ -95,4 +105,5 @@ export interface EmailPayload {
   isHtml: boolean;
   attachments: AttachmentPayload[];
   account?: string;
+  sentFolder:string
 }

@@ -50,3 +50,5 @@ Ce fichier suit l'avancement du développement. Chaque tâche doit être validé
   - Design final.
 - [ ] **Tâche 12 : Transformer en ICS un message**
 - [ ] **Tâche 13 : Transformer en tâche un message**
+- [x] **Tâche 14 : une unique instance**
+

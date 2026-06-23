@@ -4,16 +4,30 @@ use std::fs;
 use std::path::PathBuf;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AccountConfig {
+    pub id: String,
+    pub label: String,
+    pub email: String,
+    pub sent_folder: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppConfig {
-    pub root_mail_dir: String,
-    pub default_path: String,
+    pub root_mail_dir: Option<String>,
+    pub default_path: Option<String>,
+    pub limit: Option<u16>,
+    pub accounts: Option<Vec<AccountConfig>>,
+    pub default_sent_folder: Option<String>,
 }
 
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            root_mail_dir: "".to_string(),
-            default_path: "".to_string(),
+            root_mail_dir: Some("~/mail".to_string()),
+            default_path: Some("".to_string()),
+            limit: Some(1000),
+            accounts: Some(vec![]),
+            default_sent_folder: Some("Sent".to_string()),
         }
     }
 }

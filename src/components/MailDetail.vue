@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import type { Message,ThreadDto } from '../types'
+import type { ThreadDto } from '../types'
 import ThreadView from './ThreadView.vue';
 
 const props = defineProps<{

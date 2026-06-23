@@ -56,7 +56,7 @@
         <!-- Dropdown -->
         <ul v-if="suggestions['to'].length"
             class="absolute z-50 w-64 bg-white dark:bg-zinc-800 border rounded-md shadow-lg max-h-60 overflow-y-auto"
-            :style="getDropdownStyle('to')">
+            :style="getDropdownStyle()">
           <li
             v-for="(s, index) in suggestions['to']"
             :key="s.email"
@@ -75,14 +75,85 @@
       <!-- Cc -->
       <div class="flex items-center">
         <label class="w-20 font-medium text-gray-500 text-right pr-4">Cc</label>
-        <input v-model="form.cc" type="text" class="flex-1 bg-transparent border-none focus:ring-0 text-gray-800 p-1" />
+<!--        <input v-model="form.cc" type="text" class="flex-1 bg-transparent border-none focus:ring-0 text-gray-800 p-1" />-->
+                 <div
+        :ref="(el) => setContainerRef(el, 'cc')"
+        class="relative flex flex-wrap items-center gap-1 p-1 rounded-md dark:bg-zinc-800 focus-within:ring-2 focus-within:ring-blue-500 transition-all  w-full"
+      >
+        <!-- Pills -->
+        <div v-for="addr in recipients['cc']" :key="addr.email"
+             class="flex items-center gap-1 px-2 py-1 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded-full text-xs">
+          {{ addr.name }}
+          <button @click="removeRecipient('cc', addr.email)" class="hover:text-blue-900">×</button>
+        </div>
+
+        <input
+          v-model="queries['cc']"
+          @input="onInputChanged('cc')"
+          @keydown.enter="completeAddress('cc')"
+          @keydown.down.prevent="highlightNext('cc')"
+          @keydown.up.prevent="highlightPrev('cc')"
+          class="flex-1 outline-none bg-transparent text-sm"
+        />
+
+        <!-- Dropdown -->
+        <ul v-if="suggestions['cc'].length"
+            class="absolute z-50 w-64 bg-white dark:bg-zinc-800 border rounded-md shadow-lg max-h-60 overflow-y-auto"
+            :style="getDropdownStyle()">
+          <li
+            v-for="(s, index) in suggestions['cc']"
+            :key="s.email"
+            @click="selectAddress('cc', s)"
+            :class="['p-2 text-sm cursor-pointer hover:bg-blue-50 dark:hover:bg-zinc-700 transition-colors',
+                     highlightedIndex['cc'] === index ? 'bg-blue-100 dark:bg-zinc-700' : '']"
+          >
+            <div class="font-medium">{{ s.name }}</div>
+            <div class="text-xs text-gray-500">{{ s.email }}</div>
+          </li>
+        </ul>
+      </div>
+
       </div>
 
       <!-- Bcc -->
       <div class="flex items-center" v-show="showBcc">
         <label class="w-20 font-medium text-gray-500 text-right pr-4">Cci</label>
-        <input v-model="form.bcc" type="text"
-          class="flex-1 bg-transparent border-none focus:ring-0 text-gray-800 p-1" />
+         <div
+        :ref="(el) => setContainerRef(el, 'bcc')"
+        class="relative flex flex-wrap items-center gap-1 p-1 rounded-md dark:bg-zinc-800 focus-within:ring-2 focus-within:ring-blue-500 transition-all  w-full"
+      >
+        <!-- Pills -->
+        <div v-for="addr in recipients['bcc']" :key="addr.email"
+             class="flex items-center gap-1 px-2 py-1 text-blue-700 dark:bg-blue-900 dark:text-blue-300 rounded-full text-xs">
+          {{ addr.name }}
+          <button @click="removeRecipient('bcc', addr.email)" class="hover:text-blue-900">×</button>
+        </div>
+
+        <input
+          v-model="queries['bcc']"
+          @input="onInputChanged('bcc')"
+          @keydown.enter="completeAddress('bcc')"
+          @keydown.down.prevent="highlightNext('bcc')"
+          @keydown.up.prevent="highlightPrev('bcc')"
+          class="flex-1 outline-none bg-transparent text-sm"
+        />
+
+        <!-- Dropdown -->
+        <ul v-if="suggestions['bcc'].length"
+            class="absolute z-50 w-64 bg-white dark:bg-zinc-800 border rounded-md shadow-lg max-h-60 overflow-y-auto"
+            :style="getDropdownStyle()">
+          <li
+            v-for="(s, index) in suggestions['bcc']"
+            :key="s.email"
+            @click="selectAddress('bcc', s)"
+            :class="['p-2 text-sm cursor-pointer hover:bg-blue-50 dark:hover:bg-zinc-700 transition-colors',
+                     highlightedIndex['bcc'] === index ? 'bg-blue-100 dark:bg-zinc-700' : '']"
+          >
+            <div class="font-medium">{{ s.name }}</div>
+            <div class="text-xs text-gray-500">{{ s.email }}</div>
+          </li>
+        </ul>
+      </div>
       </div>
 
       <!-- Sujet et actions -->
@@ -131,41 +202,64 @@
     </div>
 
     <!-- Zone de texte (Body) -->
-    <!-- Zone de texte (Body) -->
-    <div class="flex-1 relative bg-white flex flex-col"> <!-- Added 'flex flex-col' here -->
-      <div v-if="isLoading" class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-10">
-        <span class="text-gray-500">Chargement du message...</span>
-      </div>
+<!-- Zone de texte (Body) -->
+<div class="flex-1 relative bg-white flex flex-col min-h-0"> <!-- Ajout de min-h-0 utile pour les flex-1 imbriqués -->
+  
+  <div v-if="isLoading" class="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-10">
+    <span class="text-gray-500">Chargement du message...</span>
+  </div>
 
-      <!-- Editeur HTML Quill -->
-      <!-- Removed h-64, added flex-1 and h-full -->
-      <div v-if="props.isHtml" class="mt-4 border border-gray-300 rounded-md overflow-hidden flex flex-col flex-1 h-full">
-        <QuillEditor  ref="quillEditorRef" v-model:content="form.body" contentType="html" theme="snow" class="flex-1 h-full"
-           />        
-      </div>
-      <div v-else class="mt-4 border border-gray-300 rounded-md overflow-hidden flex flex-col flex-1 h-full">
-        <textarea v-model="form.body" class="flex-1 h-full">  </textarea>
+  <!-- NOUVEAU CONTENEUR ROW : Regroupe l'Éditeur + le Copilote IA -->
+  <div class="flex-1 flex flex-row mt-4 overflow-hidden">
+    
+    <!-- Zone Éditeur (Prend l'espace restant) -->
+    <!-- Le border est déplacé ici, et on retire le mt-4 qui est remonté sur le wrapper parent -->
+    <div class="flex-1 flex flex-col border border-gray-300 rounded-md overflow-hidden">
+      
+      <div v-if="props.isHtml" class="flex-1 flex flex-col">
+        <QuillEditor  
+          ref="quillEditorRef" 
+          v-model:content="form.body" 
+          contentType="html" 
+          theme="snow" 
+          class="flex-1 "
+        />        
       </div>
       
-
-      <!-- Messages area: these will push the editor up -->
-      <div class="mt-2 space-y-2">
-        <div v-if="errorMsg" class="p-3 bg-red-100 text-red-700 rounded-md text-sm">{{ errorMsg }}</div>
-        <div v-if="successMsg" class="p-3 bg-green-100 text-green- selenium-700 rounded-md text-sm">{{ successMsg }}
-        </div>
+      <div v-else class="flex-1 flex flex-col h-full">
+        <textarea 
+          v-model="form.body" 
+          class="flex-1 h-full w-full p-2 outline-none resize-none"
+        ></textarea>
       </div>
+
     </div>
 
+    <!-- Zone Assistant IA -->
+    <!-- Intercepte l'événement 'insert-text' émis par le composant enfant -->
+     <div>
+    <AiCopilot @insert-text="handleAiInsertion"  />
+</div>
+  </div>
+
+  <!-- Messages area: these will push the editor up -->
+  <div class="mt-2 space-y-2">
+    <div v-if="errorMsg" class="p-3 bg-red-100 text-red-700 rounded-md text-sm">{{ errorMsg }}</div>
+    <div v-if="successMsg" class="p-3 bg-green-100 text-green-700 rounded-md text-sm">{{ successMsg }}</div>
+  </div>
+
+</div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, inject } from 'vue'
 import { invoke } from '@tauri-apps/api/core' // Tauri v2
-import { message, open } from '@tauri-apps/plugin-dialog' // API native pour ouvrir l'explorateur de fichiers
+import {  open } from '@tauri-apps/plugin-dialog' // API native pour ouvrir l'explorateur de fichiers
 import { QuillEditor } from '@vueup/vue-quill';
 import '@vueup/vue-quill/dist/vue-quill.snow.css';
-import { AddressMatch, Message, MessageDto } from '../types';
+import { AddressMatch, AppConfig, Message, MessageDto } from '../types';
+import AiCopilot from './AiCopilot.vue'
 // Types
 interface AttachmentUI {
   path: string
@@ -179,6 +273,7 @@ const props = defineProps<{
   tabsId: string,
   isHtml:boolean,
   message: MessageDto|null
+  config:AppConfig|undefined
 }>()
 
 // const emit = defineEmits(['close','sent']);
@@ -198,7 +293,7 @@ function setContainerRef(el: any, field: string) {
   if (el) containerRefs.value[field] = el;
 }
 
-function getDropdownStyle(field: string) {
+function getDropdownStyle() {
   return { top: '100%', left: '0px', zIndex: '1000' };
 }
 
@@ -236,8 +331,7 @@ function selectAddress(field: 'to' | 'cc' | 'bcc', addr: AddressMatch) {
   for (const s of recipients.value[field].values()){
     emails.push(s.email);
   }
-  form.to = emails.join(',')
-  console.error(form.to)
+  form[field] = emails.join(',')
 }
 function removeRecipient(field: 'to' | 'cc' | 'bcc', email: string) {
   recipients.value[field] = recipients.value[field].filter(a => a.email !== email);
@@ -284,13 +378,11 @@ const errorMsg = ref('');
 const successMsg = ref('');
 const quillEditorRef = ref<any>(null);
 // Gestion des comptes
-const accounts = ref([
-  { id: 'irisa', label: 'Compte IRISA', email: 'barais@irisa.fr' },
-  { id: 'rennes1', label: 'Compte Univ Rennes ', email: 'olivier.barais@univ-rennes.fr' }]
-)
+
+const accounts = ref(props.config?.accounts)
 
 const form = reactive({
-  account: accounts.value[0]?.id || '',
+  account: accounts.value? accounts.value[0]?.id || '':'',
   to: '',
   cc: '',
   bcc: '',
@@ -298,10 +390,12 @@ const form = reactive({
   body: ''
 })
 
-onMounted(async () => {
+
+const init = async  ()=> {
+
+    console.error('onmointed')
   try {
     isLoading.value = true
-    console.error("tabsId:", props.tabsId, "messageId:", props.messageId, "replyMode:", props.replyMode)
     if (props.messageId !== '') {
       let mess :Message={
             id: "-1",
@@ -334,7 +428,6 @@ onMounted(async () => {
       })
 
 
-      console.error("Données de réponse reçues:", replyData)
 
       form.to = replyData.to || ''
       recipients.value['to'].push({
@@ -363,6 +456,11 @@ onMounted(async () => {
   } finally {
     isLoading.value = false
   }
+
+}
+
+onMounted(async () => {
+    await init();
 })
 
 // --- GESTION DES PIÈCES JOINTES ---
@@ -442,7 +540,7 @@ const sendEmail = async () => {
     errorMsg.value = '';
     successMsg.value = '';
 
-    const selectedAccount = accounts.value.find(a => a.id === form.account)
+    const selectedAccount = accounts.value?.find(a => a.id === form.account)
     const fromAddress = selectedAccount?.email || ''
 
     // Mappage de notre tableau d'interface vers l'objet Rust attendu
@@ -463,13 +561,16 @@ const sendEmail = async () => {
       body: form.body,
       isHtml: props.isHtml,
       attachments: attachmentPayload,
-      account: form.account 
+      account: form.account,
+      sentFolder: form.account? accounts.value?.find(a=> a.id = form.account)?.sent_folder || props.config?.default_sent_folder : props.config?.default_sent_folder
     }
     if (payload.to.length === 0) {
       errorMsg.value = "Veuillez spécifier au moins un destinataire.";
       isSending.value = false;
       return;
     }
+
+    console.error('send_email',payload)
     await invoke('send_email', { payload })
     successMsg.value = "Message envoyé avec succès !";
     emit('sent', props.tabsId)
@@ -490,6 +591,20 @@ const sendEmail = async () => {
 const close = () => {
   emit('close', props.tabsId)
 }
+const handleAiInsertion = (aiText: string) => {
+  if (props.isHtml) {
+    // Si vous utilisez Quill en mode HTML, on ajoute des sauts de ligne HTML (<br>)
+    form.body += `${aiText}`;
+    setEditorText(form.body)
+    
+    // Note: Si vous vouliez insérer exactement là où est le curseur, il faudrait
+    // interagir avec l'API de Quill via quillEditorRef.value.getQuill().insertText(...)
+  } else {
+    // Si c'est du texte brut (textarea)
+    form.body += `${aiText}`;
+  }
+}
+
 </script>
 <style>
 /* Surcharge mineure pour que l'éditeur Quill ait une belle hauteur et se fonde dans Tailwind */

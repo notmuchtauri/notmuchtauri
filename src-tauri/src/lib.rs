@@ -3,12 +3,12 @@
 
 mod config;
 mod folder_scan;
-mod notmuch;
 mod msmtp;
+mod notmuch;
 use config::{AppConfig, ConfigManager};
 use folder_scan::{FolderNode, FolderScanner};
-use notmuch::{Message, NotMuchWrapper,ReplyData,AddressMatch};
 use msmtp::{EmailPayload, MSMTPWrapper};
+use notmuch::{AddressMatch, Message, NotMuchWrapper, ReplyData};
 
 use crate::notmuch::ThreadDto;
 
@@ -77,25 +77,28 @@ fn modify_message_tag(message_id: &str, tag: &str, action: &str) -> Result<(), S
 
 #[tauri::command]
 async fn send_email(payload: EmailPayload) -> Result<(), String> {
-    MSMTPWrapper::send_email(payload).await.map_err(|e| e.to_string())
-}
-
-
-#[tauri::command]
-fn get_reply_data(message_id: String, reply_mode: String, message:Message) -> Result<ReplyData, String> {
-    NotMuchWrapper::get_reply_data(message_id, reply_mode,message).map_err(|e| e.to_string())
-} 
-#[tauri::command]
-fn lookup_address(query: String, limit: usize) -> Result<Vec<AddressMatch>, String> {
-    NotMuchWrapper::lookup_address_limited(&query, limit)
+    MSMTPWrapper::send_email(payload)
+        .await
         .map_err(|e| e.to_string())
 }
-/* 
-     fn lookup_address(query: &str) -> Result<Vec<AddressMatch>, String> {
-    NotMuchWrapper::lookup_address(query).map_err(|e| e.to_string())
 
-     }*/
+#[tauri::command]
+fn get_reply_data(
+    message_id: String,
+    reply_mode: String,
+    message: Message,
+) -> Result<ReplyData, String> {
+    NotMuchWrapper::get_reply_data(message_id, reply_mode, message).map_err(|e| e.to_string())
+}
+#[tauri::command]
+fn lookup_address(query: String, limit: usize) -> Result<Vec<AddressMatch>, String> {
+    NotMuchWrapper::lookup_address_limited(&query, limit).map_err(|e| e.to_string())
+}
+/*
+ fn lookup_address(query: &str) -> Result<Vec<AddressMatch>, String> {
+NotMuchWrapper::lookup_address(query).map_err(|e| e.to_string())
 
+ }*/
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -105,6 +108,8 @@ fn greet(name: &str) -> String {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_window_state::Builder::new().build())
+        .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {}))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
@@ -118,7 +123,7 @@ pub fn run() {
             save_message_part,
             modify_message_tag,
             send_email,
-            get_reply_data, 
+            get_reply_data,
             lookup_address
         ])
         .run(tauri::generate_context!())
