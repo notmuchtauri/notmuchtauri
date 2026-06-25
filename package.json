@@ -13,12 +13,17 @@
     "@tailwindcss/vite": "^4.3.1",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.7.1",
+    "@tauri-apps/plugin-global-shortcut": "^2.3.2",
     "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-window-state": "^2.4.1",
+    "@tiptap/pm": "^3.27.1",
+    "@tiptap/starter-kit": "^3.27.1",
+    "@tiptap/vue-3": "^3.27.1",
     "@vueup/vue-quill": "^1.0.0-beta.11",
     "vue": "^3.5.13"
   },
   "devDependencies": {
+    "@tailwindcss/typography": "^0.5.20",
     "@tauri-apps/cli": "^2",
     "@vitejs/plugin-vue": "^6.0.7",
     "autoprefixer": "^10.5.0",

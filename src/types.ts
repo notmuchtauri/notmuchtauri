@@ -107,3 +107,33 @@ export interface EmailPayload {
   account?: string;
   sentFolder:string
 }
+
+// --- Interfaces pour l'API LanguageTool ---
+export  interface LTReplacement {
+  value: string;
+}
+
+export interface LTContext {
+  text: string;
+  offset: number;
+  length: number;
+}
+
+export interface ErrorOverlay {
+  match: LTMatch;
+  bounds: { top: number; left: number; width: number; height: number };
+}
+
+
+export interface LTMatch {
+  message: string;
+  shortMessage: string;
+  replacements: LTReplacement[];
+  offset: number;
+  length: number;
+  context: LTContext;
+  rule: {
+    id: string;
+    description: string;
+  };
+}

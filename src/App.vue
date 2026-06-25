@@ -488,7 +488,8 @@ onUnmounted(() => {
             <!-- Afficher le nombre d'éléments à supprimer -->
             <span v-if="selectedIds.size > 0">({{ selectedIds.size }})</span>
           </button>
-        </div>     </div>
+        </div>
+           </div>
 
       <div class="flex-1 overflow-y-auto relative">
         <div v-if="isLoading" class="p-8 text-center text-gray-500">Searching...</div>
