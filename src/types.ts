@@ -24,6 +24,12 @@ export interface AccountConfig{
   sent_folder?:string
 }
 
+export interface LlmConfig {
+  api_url: string;
+  api_key: string;
+  model: string;
+}
+
 export interface AppConfig {
   root_mail_dir: string;
   default_path: string;
@@ -33,6 +39,7 @@ export interface AppConfig {
   rmtmmail?: string
   lthostport?: string
   calendaremail:string
+  llm: LlmConfig | null;
   
 }
 

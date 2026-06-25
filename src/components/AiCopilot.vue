@@ -94,7 +94,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, inject } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
+import type { AppConfig } from '../types'
+
+const props = defineProps({
+  emailContext: {
+    type: String,
+    default: ''
+  }
+})
 
 const emit = defineEmits(['insert-text'])
 
@@ -102,6 +111,8 @@ const isExpanded = ref(false)
 const userInput = ref('')
 const isTyping = ref(false)
 const chatContainer = ref<HTMLElement | null>(null)
+
+const config: ()=> AppConfig = inject('appConfig')!;
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -118,25 +129,43 @@ const scrollToBottom = async () => {
 }
 
 const sendMessage = async () => {
-  if (!userInput.value.trim()) return
+  const text = userInput.value.trim()
+  if (!text) return
 
-  // 1. Ajouter le message utilisateur
-  const text = userInput.value
+  // Vérification de la configuration LLM
+  const llmConf = config()?.llm
+  if (!llmConf?.api_key || !llmConf?.api_url) {
+    alert("Veuillez configurer l'API LLM (URL et Clé API) dans les paramètres de l'application.")
+    return
+  }
+
+  // 1. Ajout visuel de la question
   chatHistory.value.push({ role: 'user', content: text })
   userInput.value = ''
   scrollToBottom()
-
-  // 2. Simuler l'attente de l'IA (Ici vous ferez votre appel Tauri/Backend API)
   isTyping.value = true
   
-  // -- REMPLACEZ CECI PAR VOTRE VRAI APPEL IA --
-  setTimeout(() => {
+  try {
+    // 2. Appel au backend Rust
+    const aiResponse: string = await invoke('ask_llm', {
+      prompt: text,
+      context: props.emailContext,
+      apiUrl: llmConf.api_url,
+      apiKey: llmConf.api_key,
+      model: llmConf.model || "gpt-3.5-turbo"
+    })
+
+    // 3. Affichage de la réponse
+    chatHistory.value.push({ role: 'assistant', content: aiResponse })
+    
+  } catch (error) {
     chatHistory.value.push({ 
       role: 'assistant', 
-      content: `Voici une suggestion de réponse générée pour : "${text}"` 
+      content: `❌ Erreur de communication avec l'IA : ${error}` 
     })
+  } finally {
     isTyping.value = false
     scrollToBottom()
-  }, 1500)
+  }
 }
 </script>

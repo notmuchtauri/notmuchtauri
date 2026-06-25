@@ -191,7 +191,6 @@ impl NotMuchWrapper {
         Ok(messages)
     }
 
-
     pub fn get_thread_details(thread_id: &str) -> Result<Vec<ThreadDto>, Box<dyn Error>> {
         let mut cmd = Command::new("notmuch");
 
@@ -202,7 +201,7 @@ impl NotMuchWrapper {
             .arg(format!("thread:{}", thread_id));
 
         let output = cmd.output();
-        if (output.is_err()) {
+        if output.is_err() {
             return Err("notmuch show failed to fetch thread".into());
         }
         let out = output.unwrap();
@@ -447,7 +446,6 @@ impl NotMuchWrapper {
         Ok(matches)
     }
 
-    
     /// Helper to parse the notmuch-addrlookup format: "Name <email>" or "email"
     fn parse_addr_line(line: &str) -> Option<AddressMatch> {
         if let Some(start_bracket) = line.find('<') {

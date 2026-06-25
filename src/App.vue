@@ -245,7 +245,6 @@ function openTabsNew() {
 
 
 const closeTab = (id: string): void => {
-  console.error("Closing tab with id:", id);
   openTabs.value = openTabs.value.filter(t => t.id !== id);
   if (activeTabId.value === id) {
     activeTabId.value = openTabs.value.length ? openTabs.value[0].id : null;

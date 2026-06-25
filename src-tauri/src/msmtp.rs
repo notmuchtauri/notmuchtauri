@@ -14,7 +14,7 @@ pub struct AttachmentPayload {
     pub mime_type: Option<String>, // Optionnel: ex "application/pdf"
     pub is_part: bool,
     pub part_id: i16,
-    pub message_id: String,      
+    pub message_id: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -82,49 +82,41 @@ impl MSMTPWrapper {
 
             // On utilise std::fs directement en Rust. Cela contourne les restrictions
             // de sécurité du frontend (Tauri fs scope), ce qui est idéal ici.
-            if !att.is_part{
+            if !att.is_part {
+                let content = fs::read(path)
+                    .map_err(|e| format!("Erreur de lecture de la PJ ({}): {}", file_name, e))?;
 
-            let content = fs::read(path)
-                .map_err(|e| format!("Erreur de lecture de la PJ ({}): {}", file_name, e))?;
+                let mime_type = att
+                    .mime_type
+                    .unwrap_or_else(|| "application/octet-stream".to_string())
+                    .parse()
+                    .map_err(|_| format!("Type MIME invalide pour {}", file_name))?;
 
-            let mime_type = att
-                .mime_type
-                .unwrap_or_else(|| "application/octet-stream".to_string())
-                .parse()
-                .map_err(|_| format!("Type MIME invalide pour {}", file_name))?;
+                let attachment = Attachment::new(file_name).body(content, mime_type);
+                multipart = multipart.singlepart(attachment);
+            } else {
+                let output = Command::new("notmuch")
+                    .args([
+                        "show",
+                        "--format=raw",
+                        &format!("--part={}", att.part_id),
+                        &format!("id:{}", att.message_id),
+                    ])
+                    .output()
+                    .map_err(|e| format!("Erreur lors de l'appel à notmuch: {}", e))?;
 
+                if output.status.success() {
+                    let content = output.stdout;
+                    let mime_type = att
+                        .mime_type
+                        .unwrap_or_else(|| "application/octet-stream".to_string())
+                        .parse()
+                        .map_err(|_| format!("Type MIME invalide pour {}", file_name))?;
 
-            let attachment = Attachment::new(file_name).body(content, mime_type);
-            multipart = multipart.singlepart(attachment);
-                                    }
-                                    else {
-
-                                                let output = Command::new("notmuch")
-            .args([
-                "show",
-                "--format=raw",
-                &format!("--part={}", att.part_id),
-                &format!("id:{}", att.message_id),
-            ])
-            .output()
-            .map_err(|e| format!("Erreur lors de l'appel à notmuch: {}", e))?;
-
-        if output.status.success() {
-    
-
-            let content = output.stdout;
-   let mime_type = att
-                .mime_type
-                .unwrap_or_else(|| "application/octet-stream".to_string())
-                .parse()
-                .map_err(|_| format!("Type MIME invalide pour {}", file_name))?;
-
-            let attachment = Attachment::new(file_name).body(content, mime_type);
-            multipart = multipart.singlepart(attachment);
-         
-                                    }
-                                }
-
+                    let attachment = Attachment::new(file_name).body(content, mime_type);
+                    multipart = multipart.singlepart(attachment);
+                }
+            }
         }
 
         // 4. Génération du message MIME brut
@@ -178,49 +170,46 @@ impl MSMTPWrapper {
         Ok(())
     }
 
-pub  async fn send_ics_email(
-    to_addresses: Vec<String>, 
-    subject: &str, 
-    body: &str, 
-    ics_content: &str,
-    sentfolder:&str
-) -> Result<(), String> {
-    
-    // 1. Démarrer la construction de l'e-mail
-    // Pensez à remplacer "votre_email" par la lecture de l'adresse de l'utilisateur
-    let mut builder = Message::builder()
-        .from("votre_email@domaine.com".parse().unwrap())
-        .subject(subject);
+    pub async fn send_ics_email(
+        to_addresses: Vec<String>,
+        subject: &str,
+        body: &str,
+        ics_content: &str,
+        sentfolder: &str,
+    ) -> Result<(), String> {
+        // 1. Démarrer la construction de l'e-mail
+        // Pensez à remplacer "votre_email" par la lecture de l'adresse de l'utilisateur
+        let mut builder = Message::builder()
+            .from("votre_email@domaine.com".parse().unwrap())
+            .subject(subject);
 
-    // Ajouter tous les destinataires (lettre gère "Nom <email@domaine.com>" ou juste "email@domaine.com")
-    for addr in to_addresses {
-        let parsed_addr = addr.parse().map_err(|_| format!("Adresse invalide: {}", addr))?;
-        builder = builder.to(parsed_addr);
-    }
+        // Ajouter tous les destinataires (lettre gère "Nom <email@domaine.com>" ou juste "email@domaine.com")
+        for addr in to_addresses {
+            let parsed_addr = addr
+                .parse()
+                .map_err(|_| format!("Adresse invalide: {}", addr))?;
+            builder = builder.to(parsed_addr);
+        }
 
-    // 2. Créer l'e-mail Multipart (Texte + Fichier ICS)
-    // Le Content-Type text/calendar; method=REQUEST permet aux clients mail (Outlook/Gmail)
-    // d'afficher directement les boutons "Accepter" ou "Refuser".
-    let email = builder.multipart(
-        MultiPart::mixed()
-            .singlepart(
-                SinglePart::plain(body.to_string())
+        // 2. Créer l'e-mail Multipart (Texte + Fichier ICS)
+        // Le Content-Type text/calendar; method=REQUEST permet aux clients mail (Outlook/Gmail)
+        // d'afficher directement les boutons "Accepter" ou "Refuser".
+        let email = builder
+            .multipart(
+                MultiPart::mixed()
+                    .singlepart(SinglePart::plain(body.to_string()))
+                    .singlepart(Attachment::new(String::from("invite.ics")).body(
+                        ics_content.to_string(),
+                        "text/calendar; method=REQUEST".parse().unwrap(),
+                    )),
             )
-            .singlepart(
-                Attachment::new(String::from("invite.ics"))
-                    .body(
-                        ics_content.to_string(), 
-                        "text/calendar; method=REQUEST".parse().unwrap()
-                    )
-            )
-    ).map_err(|e| format!("Erreur de construction de l'email: {}", e))?;
+            .map_err(|e| format!("Erreur de construction de l'email: {}", e))?;
 
-    // 3. Envoi via msmtp
+        // 3. Envoi via msmtp
 
         // 5. Exécution de msmtp
         let mut cmd = Command::new("msmtp");
         cmd.arg("-t"); // Demande à msmtp d'extraire les destinataires (To, Cc, Bcc) des headers MIME
-
 
         let mut child = cmd
             .stdin(Stdio::piped())
@@ -229,7 +218,7 @@ pub  async fn send_ics_email(
             .spawn()
             .map_err(|e| format!("Impossible de lancer msmtp: {}", e))?;
 
-                    let email_bytes = email.formatted();
+        let email_bytes = email.formatted();
 
         // Écriture du mail généré dans l'entrée standard de msmtp
         if let Some(mut stdin) = child.stdin.take() {
@@ -256,10 +245,8 @@ pub  async fn send_ics_email(
         MSMTPWrapper::save_to_notmuch(&raw_email_bytes, sentfolder.to_string())?;
         println!("Sauvegarde réussie !");
 
-
-
-    Ok(())
-}
+        Ok(())
+    }
 
     /// Fonction utilitaire pour injecter l'e-mail brut dans Notmuch
     fn save_to_notmuch(raw_email: &[u8], folder: String) -> Result<(), String> {

@@ -18,10 +18,17 @@ pub struct AppConfig {
     pub limit: Option<u16>,
     pub accounts: Option<Vec<AccountConfig>>,
     pub default_sent_folder: Option<String>,
-   pub  rmtmmail: Option<String>,
-   pub  lthostport: Option<String>,
-   pub calendaremail: Option<String>
-   
+    pub rmtmmail: Option<String>,
+    pub lthostport: Option<String>,
+    pub calendaremail: Option<String>,
+    pub llm: Option<LlmConfig>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct LlmConfig {
+    pub api_url: Option<String>,
+    pub api_key: Option<String>,
+    pub model: Option<String>,
 }
 
 impl Default for AppConfig {
@@ -32,10 +39,10 @@ impl Default for AppConfig {
             limit: Some(1000),
             accounts: Some(vec![]),
             default_sent_folder: Some("Sent".to_string()),
-            rmtmmail:None,
-            lthostport:None,
+            rmtmmail: None,
+            lthostport: None,
             calendaremail: Some("barais@irisa.fr".to_string()),
-
+            llm: None,
         }
     }
 }

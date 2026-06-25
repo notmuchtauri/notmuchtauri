@@ -240,7 +240,7 @@
         </div>
 
         <!-- INSÉRER ICI VOTRE COMPOSANT AI Copilot -->
-        <AiCopilot @insert-text="handleAiInsertion" />
+        <AiCopilot @insert-text="handleAiInsertion" :email-context="form.body" />
 
       </div>
 
