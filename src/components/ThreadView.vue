@@ -1,5 +1,5 @@
 <template>
-  <div class="max-w-4xl mx-auto p-4 space-y-8">
+  <div class="max-w-8xl mx-auto p-2 space-y-8">
     <div v-for="(thread, threadIndex) in threads" :key="threadIndex" class="space-y-4">
       <h2 class="text-xl font-bold text-gray-800 border-b pb-2 mb-4">
         Sujet : {{ thread.roots[0]?.subject || 'Sans objet' }}

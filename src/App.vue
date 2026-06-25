@@ -168,7 +168,7 @@ onMounted(() => {
 interface Tab {
   id: string;
   type: 'VIEW' | 'COMPOSE';
-  replyMode: 'reply' | 'reply-all' | 'forward' | 'new' | 'none';
+  replyMode: 'reply' | 'reply-all' | 'forward' | 'new' | 'editasnew' |'none';
   title: string;
   threadId?: string; // For VIEW
   originalMessageId?: string; // For COMPOSE (to know who we are replying to)
@@ -202,10 +202,10 @@ function openThread(id: string) {
 
 
 
-const openReply = (message: MessageDto, subject: string, replyMode: 'reply' | 'reply-all' | 'forward' | 'new' | 'none'
+const openReply = (message: MessageDto, subject: string, replyMode: 'reply' | 'reply-all' | 'forward' | 'editasnew'| 'new' | 'none'
 ) => {
-  console.error("Opening reply for messageId:", message.id, "with subject:", subject, "and mode:", replyMode);
   const newId = crypto.randomUUID();
+
   openTabs.value.push({
     id: newId,
     type: 'COMPOSE',
@@ -215,6 +215,7 @@ const openReply = (message: MessageDto, subject: string, replyMode: 'reply' | 'r
     isHtml: message.htmlBody !== null && message.htmlBody !== '',
     message: message
   });
+
   activeTabId.value = newId;
 }
 provide(/* key */ 'replyFunction', /* value */ openReply)

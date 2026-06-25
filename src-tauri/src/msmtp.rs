@@ -12,6 +12,9 @@ use std::process::{Command, Stdio};
 pub struct AttachmentPayload {
     pub path: String,              // Chemin absolu vers le fichier
     pub mime_type: Option<String>, // Optionnel: ex "application/pdf"
+    pub is_part: bool,
+    pub part_id: i16,
+    pub message_id: String,      
 }
 
 #[derive(Debug, Deserialize)]
@@ -79,6 +82,8 @@ impl MSMTPWrapper {
 
             // On utilise std::fs directement en Rust. Cela contourne les restrictions
             // de sécurité du frontend (Tauri fs scope), ce qui est idéal ici.
+            if !att.is_part{
+
             let content = fs::read(path)
                 .map_err(|e| format!("Erreur de lecture de la PJ ({}): {}", file_name, e))?;
 
@@ -88,8 +93,39 @@ impl MSMTPWrapper {
                 .parse()
                 .map_err(|_| format!("Type MIME invalide pour {}", file_name))?;
 
+
             let attachment = Attachment::new(file_name).body(content, mime_type);
             multipart = multipart.singlepart(attachment);
+                                    }
+                                    else {
+
+                                                let output = Command::new("notmuch")
+            .args([
+                "show",
+                "--format=raw",
+                &format!("--part={}", att.part_id),
+                &format!("id:{}", att.message_id),
+            ])
+            .output()
+            .map_err(|e| format!("Erreur lors de l'appel à notmuch: {}", e))?;
+
+        if output.status.success() {
+    
+
+            let content = output.stdout;
+   let mime_type = att
+                .mime_type
+                .unwrap_or_else(|| "application/octet-stream".to_string())
+                .parse()
+                .map_err(|_| format!("Type MIME invalide pour {}", file_name))?;
+
+
+            let attachment = Attachment::new(file_name).body(content, mime_type);
+            multipart = multipart.singlepart(attachment);
+         
+                                    }
+                                }
+
         }
 
         // 4. Génération du message MIME brut

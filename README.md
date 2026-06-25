@@ -33,11 +33,11 @@ To achieve this, NotmuchTauri acts as a modern GUI coordinator for the best CLI 
 - [x] SMTP server selection per account for sending emails
 - [x] Mail address completion based on mail history
 - [ ] LLM integration Custom Providers (OpenAI/Anthropic Compatible)
-- [ ] Edit as new email
-- [ ] Notmuch query auto-completion
+- [x] Edit as new email
+- [x] Notmuch query auto-completion
 - [ ] ICS event creation from email
 - [ ] [Remember The Milk](https://www.rememberthemilk.com/) task creation from email
-- [ ] Email spell check with language detection (using `Ctrl + Tab`)
+- [x] Email spell check with language detection
 - [ ] Customizable keyboard shortcuts
 - [ ] Customizable text snippets (useful for greetings)
 - [ ] Outbox folder management (send emails when network is back up)

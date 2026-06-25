@@ -167,114 +167,108 @@
 
     <!-- Zone de texte (Body) -->
     <!-- Zone de texte (Body) -->
-      <div class="flex-1 relative bg-white flex flex-col min-h-0">
-    
+    <div class="flex-1 relative bg-white flex flex-col min-h-0">
 
-    <!-- Conteneur principal -->
-    <div class="flex-1 flex flex-row mt-2 overflow-hidden gap-4">
-      
-      <!-- Conteneur GLOBAL Éditeur -->
-      <div class="flex-1 border border-gray-300 rounded-md overflow-hidden bg-white flex flex-col">
-        
-        <!-- Barre d'outils Tiptap (Masquée si isHtml est faux) -->
-        <div v-if="props.isHtml && editor" class="flex flex-wrap items-center gap-1 p-2 border-b border-gray-200 bg-gray-50 flex-shrink-0 z-20">
-          <button @click="editor.chain().focus().toggleHeading({level:1}).run()" :class="{ 'bg-gray-200': editor.isActive('heading',{level:1}) }" class="p-1.5 rounded hover:bg-gray-200 text-gray-700 font-bold w-8 h-8">H1</button>
-          <button @click="editor.chain().focus().toggleHeading({level:2}).run()" :class="{ 'bg-gray-200': editor.isActive('heading',{level:2}) }" class="p-1.5 rounded hover:bg-gray-200 text-gray-700 font-bold w-8 h-8">H2</button>
 
-          <button @click="editor.chain().focus().toggleBold().run()" :class="{ 'bg-gray-200': editor.isActive('bold') }" class="p-1.5 rounded hover:bg-gray-200 text-gray-700 font-bold w-8 h-8">B</button>
-          <button @click="editor.chain().focus().toggleItalic().run()" :class="{ 'bg-gray-200': editor.isActive('italic') }" class="p-1.5 rounded hover:bg-gray-200 text-gray-700 italic w-8 h-8">I</button>
-          <button @click="editor.chain().focus().toggleStrike().run()" :class="{ 'bg-gray-200': editor.isActive('strike') }" class="p-1.5 rounded hover:bg-gray-200 text-gray-700 line-through w-8 h-8">S</button>
-          <div class="w-px h-5 bg-gray-300 mx-1"></div>
-          <button @click="editor.chain().focus().toggleBulletList().run()" :class="{ 'bg-gray-200': editor.isActive('bulletList') }" class="p-1.5 rounded hover:bg-gray-200 text-gray-700 w-8 h-8">•</button>
-          <button @click="editor.chain().focus().toggleOrderedList().run()" :class="{ 'bg-gray-200': editor.isActive('orderedList') }" class="p-1.5 rounded hover:bg-gray-200 text-gray-700 w-8 h-8">1.</button>
-          <div class="w-px h-5 bg-gray-300 mx-1"></div>
+      <!-- Conteneur principal -->
+      <div class="flex-1 flex flex-row mt-2 overflow-hidden gap-4">
 
-                <select v-model="spellLanguage" class="text-xs border border-gray-300 rounded p-1">
-        <option value="fr">Français</option>
-        <option value="en-US">English</option>
-      </select>
-      
-      <button 
-        @click="checkSpelling" 
-        :disabled="isCheckingSpelling"
-        class="px-3 py-1.5 text-sm bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-md transition-colors"
-      >
-        {{ isCheckingSpelling ? 'Vérification...' : "Vérifier l'orthographe" }}
-      </button>
+        <!-- Conteneur GLOBAL Éditeur -->
+        <div class="flex-1 border border-gray-300 rounded-md overflow-hidden bg-white flex flex-col">
 
-        </div>
-        
-        <!-- ZONE DE TEXTE ET CALQUES (RELATIVE) -->
-        <!-- ref="editorAreaRef" est appliqué ici pour calculer les coordonnées justes sous la toolbar -->
-        <div ref="editorAreaRef" class="relative flex-1 flex flex-col min-h-0">
-          
-          <!-- Zone d'édition Tiptap -->
-          <editor-content 
-            :editor="editor" 
-            class="flex-1 overflow-y-auto outline-none tiptap-container" 
-            :class="{ 'is-plain-text': !props.isHtml }"
-          />
+          <!-- Barre d'outils Tiptap (Masquée si isHtml est faux) -->
+          <div v-if="props.isHtml && editor"
+            class="flex flex-wrap items-center gap-1 p-2 border-b border-gray-200 bg-gray-50 flex-shrink-0 z-20">
+            <button @click="editor.chain().focus().toggleHeading({ level: 1 }).run()"
+              :class="{ 'bg-gray-200': editor.isActive('heading', { level: 1 }) }"
+              class="p-1.5 rounded hover:bg-gray-200 text-gray-700 font-bold w-8 h-8">H1</button>
+            <button @click="editor.chain().focus().toggleHeading({ level: 2 }).run()"
+              :class="{ 'bg-gray-200': editor.isActive('heading', { level: 2 }) }"
+              class="p-1.5 rounded hover:bg-gray-200 text-gray-700 font-bold w-8 h-8">H2</button>
 
-          <!-- Calques des erreurs LT (Inset-0 prend 100% de la zone d'édition) -->
-          <div class="absolute inset-0 pointer-events-none overflow-hidden z-10">
-            <div
-              v-for="(overlay, i) in errorOverlays" 
-              :key="i"
-              class="absolute pointer-events-auto cursor-context-menu hover:bg-red-50 hover:bg-opacity-30"
-              :style="{
-                top: overlay.bounds.top + 'px',
-                left: overlay.bounds.left + 'px',
-                width: overlay.bounds.width + 'px',
-                height: (overlay.bounds.height) + 'px',
-                borderBottom: '2px dotted #ef4444' /* Ligne rouge en bas */
-              }"
-              @contextmenu.prevent="openSpellMenu($event, overlay.match)"
-              @click.stop="openSpellMenu($event, overlay.match)"
-              title="Clic pour corriger"
-            ></div>
+            <button @click="editor.chain().focus().toggleBold().run()"
+              :class="{ 'bg-gray-200': editor.isActive('bold') }"
+              class="p-1.5 rounded hover:bg-gray-200 text-gray-700 font-bold w-8 h-8">B</button>
+            <button @click="editor.chain().focus().toggleItalic().run()"
+              :class="{ 'bg-gray-200': editor.isActive('italic') }"
+              class="p-1.5 rounded hover:bg-gray-200 text-gray-700 italic w-8 h-8">I</button>
+            <button @click="editor.chain().focus().toggleStrike().run()"
+              :class="{ 'bg-gray-200': editor.isActive('strike') }"
+              class="p-1.5 rounded hover:bg-gray-200 text-gray-700 line-through w-8 h-8">S</button>
+            <div class="w-px h-5 bg-gray-300 mx-1"></div>
+            <button @click="editor.chain().focus().toggleBulletList().run()"
+              :class="{ 'bg-gray-200': editor.isActive('bulletList') }"
+              class="p-1.5 rounded hover:bg-gray-200 text-gray-700 w-8 h-8">•</button>
+            <button @click="editor.chain().focus().toggleOrderedList().run()"
+              :class="{ 'bg-gray-200': editor.isActive('orderedList') }"
+              class="p-1.5 rounded hover:bg-gray-200 text-gray-700 w-8 h-8">1.</button>
+            <div class="w-px h-5 bg-gray-300 mx-1"></div>
+
+            <select v-model="spellLanguage" class="text-xs border border-gray-300 rounded p-1">
+              <option value="fr">Français</option>
+              <option value="en-US">English</option>
+            </select>
+
+            <button @click="checkSpelling" :disabled="isCheckingSpelling"
+              class="px-3 py-1.5 text-sm bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-md transition-colors">
+              {{ isCheckingSpelling ? 'Vérification...' : "Vérifier l'orthographe" }}
+            </button>
+
+          </div>
+
+          <!-- ZONE DE TEXTE ET CALQUES (RELATIVE) -->
+          <!-- ref="editorAreaRef" est appliqué ici pour calculer les coordonnées justes sous la toolbar -->
+          <div ref="editorAreaRef" class="relative flex-1 w-full min-h-0">
+
+            <!-- Zone d'édition Tiptap (Étirée aux 4 coins via absolute inset-0) -->
+            <editor-content :editor="editor" class="absolute inset-0 overflow-y-auto outline-none tiptap-container"
+              :class="{ 'is-plain-text': !props.isHtml }" />
+
+            <!-- Calques des erreurs LT (Étirés aussi) -->
+            <div class="absolute inset-0 pointer-events-none overflow-hidden z-10">
+              <div v-for="(overlay, i) in errorOverlays" :key="i"
+                class="absolute pointer-events-auto cursor-context-menu hover:bg-red-50 hover:bg-opacity-30" :style="{
+                  top: overlay.bounds.top + 'px',
+                  left: overlay.bounds.left + 'px',
+                  width: overlay.bounds.width + 'px',
+                  height: overlay.bounds.height + 'px',
+                  borderBottom: '2px dotted #ef4444'
+                }" @contextmenu.prevent="openSpellMenu($event, overlay.match)"
+                @click.stop="openSpellMenu($event, overlay.match)" title="Clic pour corriger"></div>
+            </div>
           </div>
         </div>
+
+        <!-- INSÉRER ICI VOTRE COMPOSANT AI Copilot -->
+        <AiCopilot @insert-text="handleAiInsertion" />
+
       </div>
 
-      <!-- INSÉRER ICI VOTRE COMPOSANT AI Copilot -->
-       <AiCopilot @insert-text="handleAiInsertion" /> 
+      <!-- MENU CONTEXTUEL DES SUGGESTIONS -->
+      <Teleport to="body">
+        <div v-if="spellMenu.show && spellMenu.match"
+          class="fixed z-[100] w-64 bg-white border border-gray-200 rounded-md shadow-xl overflow-hidden" :style="{
+            top: spellMenu.y + 'px', left: spellMenu.x + 'px',
+            transform: `translate(${spellMenu.isLeftwards ? 'calc(-100% - 5px)' : '5px'}, ${spellMenu.isUpwards ? 'calc(-100% - 5px)' : '5px'})`
+          }" @contextmenu.prevent @click.stop>
+          <div class="px-3 py-2 bg-red-50 border-b border-red-100 text-xs font-semibold text-red-800">
+            {{ spellMenu.match.message }}
+          </div>
+
+          <div class="max-h-48 overflow-y-auto">
+            <button v-for="rep in spellMenu.match.replacements" :key="rep.value" @click="applyCorrection(rep.value)"
+              class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors">
+              {{ rep.value }}
+            </button>
+
+            <div v-if="spellMenu.match.replacements.length === 0" class="px-4 py-3 text-sm text-gray-500 italic">
+              Aucune suggestion
+            </div>
+          </div>
+        </div>
+      </Teleport>
 
     </div>
-
-    <!-- MENU CONTEXTUEL DES SUGGESTIONS -->
-    <Teleport to="body">
-      <div 
-        v-if="spellMenu.show && spellMenu.match" 
-        class="fixed z-[100] w-64 bg-white border border-gray-200 rounded-md shadow-xl overflow-hidden"
-        :style="{ 
-          top: spellMenu.y + 'px', left: spellMenu.x + 'px',
-          transform: `translate(${spellMenu.isLeftwards ? 'calc(-100% - 5px)' : '5px'}, ${spellMenu.isUpwards ? 'calc(-100% - 5px)' : '5px'})`
-        }" 
-        @contextmenu.prevent
-        @click.stop
-      >
-        <div class="px-3 py-2 bg-red-50 border-b border-red-100 text-xs font-semibold text-red-800">
-          {{ spellMenu.match.message }}
-        </div>
-        
-        <div class="max-h-48 overflow-y-auto">
-          <button 
-            v-for="rep in spellMenu.match.replacements" 
-            :key="rep.value"
-            @click="applyCorrection(rep.value)"
-            class="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
-          >
-            {{ rep.value }}
-          </button>
-          
-          <div v-if="spellMenu.match.replacements.length === 0" class="px-4 py-3 text-sm text-gray-500 italic">
-            Aucune suggestion
-          </div>
-        </div>
-      </div>
-    </Teleport>
-
-  </div>
   </div>
 </template>
 
@@ -293,12 +287,16 @@ import AiCopilot from './AiCopilot.vue'
 interface AttachmentUI {
   path: string
   name: string
+  isPart: boolean
+  messageId?: string
+  part?: number
+
 }
 
 // Props
 const props = defineProps<{
   messageId: string
-  replyMode: 'reply' | 'reply-all' | 'forward' | 'new' | 'none'
+  replyMode: 'reply' | 'reply-all' | 'forward' | 'editasnew' | 'new' | 'none'
   tabsId: string,
   isHtml: boolean,
   message: MessageDto | null
@@ -426,16 +424,16 @@ const form = reactive({
 // --- 1. INITIALISATION DE TIPTAP ---
 const editor = useEditor({
   extensions: [StarterKit.configure({
-      heading: {
-        levels: [1, 2, 3],
-      }
-    })
-    ],
+    heading: {
+      levels: [1, 2, 3],
+    }
+  })
+  ],
   content: form.body,
   onUpdate: ({ editor }) => {
     // Synchronisation avec la variable form.body
     form.body = props.isHtml ? editor.getHTML() : editor.getText()
-    
+
     // Si l'utilisateur tape du texte, on efface les erreurs pour éviter les décalages
     if (spellingMatches.value.length > 0) {
       spellingMatches.value = []
@@ -444,9 +442,9 @@ const editor = useEditor({
   },
   // Recalcule les soulignements lors du défilement interne de l'éditeur
   editorProps: {
-      attributes: {
-        class: 'prose prose-sm sm:prose-base lg:prose-lg xl:prose-2xl m-5 focus:outline-none',
-      },
+    attributes: {
+      class: 'prose-sm sm:prose-base lg:prose-lg xl:prose-2xl w-full',
+    },
     handleScrollToSelection: () => {
       updateOverlays()
       return false
@@ -456,73 +454,158 @@ const editor = useEditor({
 
 const init = async () => {
 
- document.addEventListener('click', closeSpellMenu)
+  document.addEventListener('click', closeSpellMenu)
   // On écoute le scroll de l'éditeur Tiptap
   if (editor.value?.view.dom) {
     editor.value.view.dom.addEventListener('scroll', updateOverlays)
   }
-  console.error('onmointed')
-  try {
+  if (props.replyMode == 'editasnew') {
     isLoading.value = true
-    if (props.messageId !== '') {
-      let mess: Message = {
-        id: "-1",
-        subject: '',
-        from: '',
-        to: '',
-        date: '',
-        body: '',
-        tags: [],
-        is_read: false,
-        has_attachments: false
+
+
+    form.to = props.message?.to || ''
+    let mails = splitEmails(props.message!.to);
+    mails.forEach(m => {
+      recipients.value['to'].push({
+        name: m,
+        email: m
+      })
+
+    })
+    form.cc = props.message?.cc || ''
+    mails = splitEmails(props.message!.cc);
+    mails.forEach(m => {
+      recipients.value['cc'].push({
+        name: m,
+        email: m
+      })
+    })
+
+
+    form.subject = props.message?.subject || ''
+    if (!props.isHtml) {
+      form.body = `${props.message?.textBody}`
+      if (editor.value) {
+        editor.value.commands.setContent(`${props.message?.textBody}`)
       }
-      if (props.message !== null && props.isHtml) {
-        mess = {
-          id: props.message.id,
-          subject: props.message.subject,
-          from: props.message.from,
-          to: props.message.to,
-          date: props.message.date,
-          body: props.message.htmlBody!,
+    } else {
+      form.body = props.message?.htmlBody || ''
+      if (editor.value) {
+        editor.value.commands.setContent(`${props.message?.htmlBody} `)
+      }
+
+    }
+    if (props.message?.attachments) {
+      for (const a of props.message?.attachments!) {
+        attachments.value.push({
+          path: a.filename,
+          name: a.filename,
+          part: a.partId,
+          messageId: props.message.id,
+          isPart: true
+        })
+      }
+    }
+
+
+    isLoading.value = false
+
+
+  } else {
+    try {
+      isLoading.value = true
+      if (props.messageId !== '') {
+        let mess: Message = {
+          id: "-1",
+          subject: '',
+          from: '',
+          to: '',
+          date: '',
+          body: '',
           tags: [],
           is_read: false,
           has_attachments: false
         }
-      }
-      const replyData: any = await invoke('get_reply_data', {
-        messageId: props.messageId,
-        replyMode: props.replyMode,
-        message: mess
-      })
+        if (props.message !== null && props.isHtml) {
+          mess = {
+            id: props.message.id,
+            subject: props.message.subject,
+            from: props.message.from,
+            to: props.message.to,
+            date: props.message.date,
+            body: props.message.htmlBody!,
+            tags: [],
+            is_read: false,
+            has_attachments: false
+          }
+        }
+        const replyData: any = await invoke('get_reply_data', {
+          messageId: props.messageId,
+          replyMode: props.replyMode,
+          message: mess
+        })
 
 
 
-      form.to = replyData.to || ''
+        form.to = replyData.to || ''
+    let mails = splitEmails(replyData.to);
+    mails.forEach(m => {
       recipients.value['to'].push({
-        name: replyData.to,
-        email: replyData.to
+        name: m,
+        email: m
       })
-      form.cc = replyData.cc || ''
-      form.subject = replyData.subject || ''
-      if (!props.isHtml) {
-        form.body = `\n\n${replyData.body || ''}`
+    })
+        form.cc = replyData.cc || ''
+            mails = splitEmails(replyData.cc);
+    mails.forEach(m => {
+      recipients.value['cc'].push({
+        name: m,
+        email: m
+      })
+    })
+
+        form.subject = replyData.subject || ''
+        if (!props.isHtml) {
+          form.body = `\n${replyData.body}`
+          if (editor.value) {
+            editor.value.commands.insertContent(`\n${replyData.body} `)
+          }
+        } else {
+          form.body = replyData.bodyhtml
+          if (editor.value) {
+            editor.value.commands.insertContent(`${replyData.bodyhtml}`)
+          }
+
+        }
+
+        if (props.replyMode==='forward'){
+        if (props.message?.attachments) {
+          for (const a of props.message?.attachments!) {
+            attachments.value.push({
+              path: a.filename,
+              name: a.filename,
+              part: a.partId,
+              messageId: props.message.id,
+              isPart: true
+            })
+          }
+        }
+
+        }
 
       } else {
-        form.body = replyData.bodyhtml
+        form.to = ''
+        form.cc = ''
+        form.subject = ''
+        form.body = `\n\n${''}`
+
       }
 
-    } else {
-      form.to = ''
-      form.cc = ''
-      form.subject = ''
-      form.body = `\n\n${''}`
-
+    } catch (error) {
+      console.error("Erreur lors de la préparation de la réponse:", error)
+    } finally {
+      isLoading.value = false
     }
-
-  } catch (error) {
-    console.error("Erreur lors de la préparation de la réponse:", error)
-  } finally {
-    isLoading.value = false
   }
 
 }
@@ -554,7 +637,8 @@ const addAttachments = async () => {
         const fileName = filePath.split(/[/\\]/).pop() || filePath
         attachments.value.push({
           path: filePath,
-          name: fileName
+          name: fileName,
+          isPart: false
         })
       }
     }
@@ -594,6 +678,9 @@ const sendEmail = async () => {
     // Mappage de notre tableau d'interface vers l'objet Rust attendu
     const attachmentPayload = attachments.value.map(file => ({
       path: file.path,
+      isPart: file.isPart,
+      partId: file.isPart ? file.part : -1,
+      messageId: file.isPart ? file.messageId : '',
       // On passe null (ou undefined) car le backend Rust a "Option<String>"
       // Optionnel: On pourrait utiliser un package NPM "mime-types" côté JS, 
       // ou laisser le Backend Rust deviner le mimetype (recommandé).
@@ -673,10 +760,10 @@ function offsetToProseMirrorPos(targetOffset: number): number {
   if (!editor.value) return 0
   let currentOffset = 0
   let resolvedPos = 0
-  
+
   editor.value.state.doc.descendants((node, pos) => {
-    if (resolvedPos) return false 
-    
+    if (resolvedPos) return false
+
     if (node.isText) {
       const textLen = node.text?.length || 0
       if (currentOffset + textLen >= targetOffset) {
@@ -684,10 +771,10 @@ function offsetToProseMirrorPos(targetOffset: number): number {
       }
       currentOffset += textLen
     } else if (node.isBlock) {
-      if (pos > 0) currentOffset += 1 
+      if (pos > 0) currentOffset += 1
     }
   })
-  
+
   return resolvedPos || 1
 }
 
@@ -727,14 +814,14 @@ const updateOverlays = () => {
 // --- 4. APPEL A LANGUAGETOOL ---
 const checkSpelling = async () => {
   if (!editor.value) return
-  
+
   // Extraction garantie pour LT : chaque paragraphe est séparé par \n
   const textToCheck = editor.value.state.doc.textBetween(0, editor.value.state.doc.content.size, '\n', '\n')
-  
+
   if (!textToCheck.trim()) return
 
   isCheckingSpelling.value = true
-  
+
   try {
     const params = new URLSearchParams()
     params.append('text', textToCheck)
@@ -750,7 +837,7 @@ const checkSpelling = async () => {
 
     const data = await response.json()
     spellingMatches.value = data.matches
-    
+
     await nextTick()
     updateOverlays()
 
@@ -764,8 +851,8 @@ const checkSpelling = async () => {
 
 // --- 5. CORRECTION ET MENU ---
 const openSpellMenu = (event: MouseEvent, match: LTMatch) => {
-  const MENU_HEIGHT = 250; 
-  const MENU_WIDTH = 260;  
+  const MENU_HEIGHT = 250;
+  const MENU_WIDTH = 260;
   const spaceBelow = window.innerHeight - event.clientY;
   const spaceRight = window.innerWidth - event.clientX;
 
@@ -785,11 +872,11 @@ const closeSpellMenu = () => {
 
 const applyCorrection = (replacementValue: string) => {
   if (!spellMenu.value.match || !editor.value) return
-  
+
   const match = spellMenu.value.match
   const startPos = offsetToProseMirrorPos(match.offset)
   const endPos = offsetToProseMirrorPos(match.offset + match.length)
-  
+
   // Applique la correction à l'index exact sans casser le style HTML ni le texte
   editor.value.chain().focus()
     .deleteRange({ from: startPos, to: endPos })
@@ -797,7 +884,7 @@ const applyCorrection = (replacementValue: string) => {
     .run()
 
   closeSpellMenu()
-  checkSpelling() 
+  checkSpelling()
 }
 
 // Pour l'intégration AI Copilot (Remplacement de la méthode Quill)
@@ -805,18 +892,17 @@ const handleAiInsertion = (aiText: string) => {
   if (props.isHtml && editor.value) {
     // Insère le HTML ou le texte à la position du curseur
     editor.value.commands.insertContent(`<p>${aiText}</p>`)
-  } else {
-    form.body += `\n\n${aiText}`
+  } else if (editor.value) {
+    editor.value.commands.insertContent(`${aiText}`)
   }
 }
 
 
 // Nettoyage global
 // onMounted(() => )
-onUnmounted(() => 
-{
- document.removeEventListener('click', closeSpellMenu)
-  if (editor.value) editor.value.destroy()  
+onUnmounted(() => {
+  document.removeEventListener('click', closeSpellMenu)
+  if (editor.value) editor.value.destroy()
 }
 )
 
@@ -825,17 +911,21 @@ onUnmounted(() =>
 </script>
 <style scoped>
 :deep(.tiptap-container) {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
+  width: 100%;
+  height: 100%;
 }
 
+/* La zone de frappe réelle */
 :deep(.ProseMirror) {
-  flex: 1;
-  padding: 0.25rem;
+  width: 100%;
+  min-height: 100%;
+  /* Permet de cliquer n'importe où pour focus l'éditeur */
+  padding: 1rem;
   outline: none;
-  overflow-y: auto;
+  box-sizing: border-box;
+  /* Empêche le padding de faire déborder la div */
+  word-wrap: break-word;
+  white-space: pre-wrap;
 }
 
 /* Base style HTML */
@@ -843,22 +933,27 @@ onUnmounted(() =>
   margin-bottom: 0.25em;
   font-size: medium;
 }
+
 :deep(.ProseMirror ul) {
   list-style-type: disc;
   padding-left: 1.5rem;
   margin-bottom: 0.75em;
 }
+
 :deep(.ProseMirror ol) {
   list-style-type: decimal;
   padding-left: 1.5rem;
   margin-bottom: 0.75em;
 }
+
 :deep(.ProseMirror h1) {
   font-size: xx-large;
 }
+
 :deep(.ProseMirror h2) {
   font-size: larger;
 }
+
 :deep(.ProseMirror h3) {
   font-size: medium;
 }
@@ -868,8 +963,10 @@ onUnmounted(() =>
 .is-plain-text :deep(.ProseMirror) {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-size: 10px;
-  color: #374151; /* gray-700 */
+  color: #374151;
+  /* gray-700 */
 }
+
 /* Retire les marges de paragraphe en mode texte brut pour simuler un textarea */
 .is-plain-text :deep(.ProseMirror p) {
   margin-bottom: 0;
