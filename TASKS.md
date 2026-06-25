@@ -33,12 +33,13 @@ Ce fichier suit l'avancement du développement. Chaque tâche doit être validé
   - [x] Agrandir la largeur de la modal
 
 ## Phase 3 : Intelligence Artificielle (L' "Assistant")
-- [ ] **Tâche 8 : Configurer le client API Claude dans Rust**
+- [x] **Tâche 8 : Configurer le client API Claude dans Rust**
   - Gestion sécurisée des clés API.
   - Client HTTP pour les requêtes vers Anthropic.
-- [ ] **Tâche 9 : Implémenter l'analyse et la suggestion de réponse**
+- [x] **Tâche 9 : Implémenter l'analyse et la suggestion de réponse**
   - Analyse du contexte d'un mail.
   - Génération de brouillons de réponse intelligents.
+  - [ ] Insertion d'une zone séléctionné à la fois pour le contexte et la réponse
 
 ## Phase 4 : Polissage et UX (La "Finition")
 - [x] **Tâche 10 : Gestion des pièces jointes**
