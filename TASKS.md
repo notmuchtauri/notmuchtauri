@@ -33,22 +33,24 @@ Ce fichier suit l'avancement du développement. Chaque tâche doit être validé
   - [x] Agrandir la largeur de la modal
 
 ## Phase 3 : Intelligence Artificielle (L' "Assistant")
-- [ ] **Tâche 8 : Configurer le client API Claude dans Rust**
+- [x] **Tâche 8 : Configurer le client API Claude dans Rust**
   - Gestion sécurisée des clés API.
   - Client HTTP pour les requêtes vers Anthropic.
-- [ ] **Tâche 9 : Implémenter l'analyse et la suggestion de réponse**
+- [x] **Tâche 9 : Implémenter l'analyse et la suggestion de réponse**
   - Analyse du contexte d'un mail.
   - Génération de brouillons de réponse intelligents.
+  - [ ] Insertion d'une zone séléctionné à la fois pour le contexte et la réponse
 
 ## Phase 4 : Polissage et UX (La "Finition")
-- [ ] **Tâche 10 : Gestion des pièces jointes**
+- [x] **Tâche 10 : Gestion des pièces jointes**
   - Parsing des attachments.
   - Ouverture des fichiers via l'OS.
   - Inline pdf avec pdfjs dans une modal
 - [ ] **Tâche 11 : Polissage UX et optimisations**
   - Raccourcis clavier.
   - Design final.
-- [ ] **Tâche 12 : Transformer en ICS un message**
-- [ ] **Tâche 13 : Transformer en tâche un message**
+- [x] **Tâche 12 : Transformer en ICS un message**
+- [x] **Tâche 13 : Transformer en tâche un message** https://www.rememberthemilk.com/services/email/
 - [x] **Tâche 14 : une unique instance**
-
+- [x] ** Refresh new mail every é minutes**
+- [ ] To get push, notifications when new email arrive, I use a personal version of [node-imapnotify](https://github.com/barais/node-imapnotify) based on the initial version of [node-imapnotify](https://github.com/a-sk/node-imapnotify/).

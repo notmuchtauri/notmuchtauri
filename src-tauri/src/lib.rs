@@ -3,6 +3,7 @@
 
 mod config;
 mod folder_scan;
+mod llm;
 mod msmtp;
 mod notmuch;
 use config::{AppConfig, ConfigManager};
@@ -10,7 +11,7 @@ use folder_scan::{FolderNode, FolderScanner};
 use msmtp::{EmailPayload, MSMTPWrapper};
 use notmuch::{AddressMatch, Message, NotMuchWrapper, ReplyData};
 
-use crate::notmuch::ThreadDto;
+use crate::{llm::LLMWrapper, notmuch::ThreadDto};
 
 #[tauri::command]
 fn get_config() -> Result<AppConfig, String> {
@@ -94,6 +95,20 @@ fn get_reply_data(
 fn lookup_address(query: String, limit: usize) -> Result<Vec<AddressMatch>, String> {
     NotMuchWrapper::lookup_address_limited(&query, limit).map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+async fn send_ics_email(
+    to_addresses: Vec<String>,
+    subject: &str,
+    body: &str,
+    ics_content: &str,
+    sentfolder: &str,
+) -> Result<(), String> {
+    MSMTPWrapper::send_ics_email(to_addresses, subject, body, ics_content, sentfolder)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /*
  fn lookup_address(query: &str) -> Result<Vec<AddressMatch>, String> {
 NotMuchWrapper::lookup_address(query).map_err(|e| e.to_string())
@@ -105,9 +120,24 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
+#[tauri::command]
+async fn ask_llm(
+    prompt: String,
+    context: String,
+    api_url: String,
+    api_key: String,
+    model: String,
+) -> Result<String, String> {
+    LLMWrapper::ask_llm(prompt, context, api_url, api_key, model)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {}))
         .plugin(tauri_plugin_dialog::init())
@@ -124,7 +154,9 @@ pub fn run() {
             modify_message_tag,
             send_email,
             get_reply_data,
-            lookup_address
+            lookup_address,
+            send_ics_email,
+            ask_llm
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

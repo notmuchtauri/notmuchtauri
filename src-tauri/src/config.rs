@@ -12,12 +12,31 @@ pub struct AccountConfig {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ShortcuConfig {
+    pub shortcut: String,
+    pub text: String
+}
+
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AppConfig {
     pub root_mail_dir: Option<String>,
     pub default_path: Option<String>,
     pub limit: Option<u16>,
     pub accounts: Option<Vec<AccountConfig>>,
     pub default_sent_folder: Option<String>,
+    pub rmtmmail: Option<String>,
+    pub lthostport: Option<String>,
+    pub calendaremail: Option<String>,
+    pub llm: Option<LlmConfig>,
+    pub shortcuts: Option<Vec<ShortcuConfig>>
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct LlmConfig {
+    pub api_url: Option<String>,
+    pub api_key: Option<String>,
+    pub model: Option<String>,
 }
 
 impl Default for AppConfig {
@@ -28,6 +47,11 @@ impl Default for AppConfig {
             limit: Some(1000),
             accounts: Some(vec![]),
             default_sent_folder: Some("Sent".to_string()),
+            rmtmmail: None,
+            lthostport: None,
+            calendaremail: Some("barais@irisa.fr".to_string()),
+            llm: None,
+            shortcuts:None
         }
     }
 }
@@ -38,7 +62,7 @@ impl ConfigManager {
     pub fn load() -> Result<AppConfig, Box<dyn Error>> {
         // In a real Tauri app, we'd use tauri::api::path::app_config_dir()
         // For now, we look for a simple config.json in the current directory or home
-        let config_path = PathBuf::from("/home/barais/git/notmuchtauri/notmuchtauri/config.json");
+        let config_path = PathBuf::from("config.json");
         println!("Loading config from: {:?}", config_path.as_path().display());
         if !config_path.exists() {
             return Ok(AppConfig::default());

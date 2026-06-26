@@ -24,12 +24,28 @@ export interface AccountConfig{
   sent_folder?:string
 }
 
+export interface LlmConfig {
+  api_url: string;
+  api_key: string;
+  model: string;
+}
+
+export interface ShortcuConfig {
+   shortcut: string,
+   text: string
+}
+
 export interface AppConfig {
   root_mail_dir: string;
   default_path: string;
   limit:number,
   accounts: AccountConfig[]
-  default_sent_folder:string
+  default_sent_folder:string,
+  rmtmmail?: string
+  lthostport?: string
+  calendaremail:string
+  llm: LlmConfig | null;  
+  shortcuts: ShortcuConfig[];
 }
 
 export interface Thread {
@@ -63,6 +79,10 @@ export interface AttachmentDto {
   contentId: string | null;
 }
 
+export interface ThreadDto {
+  roots: MessageDto[];
+}
+
 export interface MessageDto {
   id: string;
   subject: string;
@@ -86,9 +106,6 @@ export interface AddressMatch {
 }
 
 
-export interface ThreadDto {
-  roots: MessageDto[];
-}
 
 export interface AttachmentPayload {
   path: string;
@@ -106,4 +123,34 @@ export interface EmailPayload {
   attachments: AttachmentPayload[];
   account?: string;
   sentFolder:string
+}
+
+// --- Interfaces pour l'API LanguageTool ---
+export  interface LTReplacement {
+  value: string;
+}
+
+export interface LTContext {
+  text: string;
+  offset: number;
+  length: number;
+}
+
+export interface ErrorOverlay {
+  match: LTMatch;
+  bounds: { top: number; left: number; width: number; height: number };
+}
+
+
+export interface LTMatch {
+  message: string;
+  shortMessage: string;
+  replacements: LTReplacement[];
+  offset: number;
+  length: number;
+  context: LTContext;
+  rule: {
+    id: string;
+    description: string;
+  };
 }

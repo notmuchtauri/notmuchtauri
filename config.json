@@ -1,8 +1,27 @@
 {
   "root_mail_dir": "/home/barais/mail",
   "default_path": "/home/barais/mail/IRISA/INBOX",
-  "limit":1000,
-  "accounts":[{ "id": "irisa", "label": "Compte IRISA", "email": "barais@irisa.fr", "sent_folder":"IRISA/Sent" },
-  { "id": "rennes1", "label": "Compte Univ Rennes ", "email": "olivier.barais@univ-rennes.fr" }],
-  "default_sent_folder":"Sent"
+  "limit": 1000,
+  "accounts": [
+    {
+      "id": "irisa",
+      "label": "Compte IRISA",
+      "email": "barais@irisa.fr",
+      "sent_folder": "IRISA/Sent"
+    },
+    {
+      "id": "rennes1",
+      "label": "Compte Univ Rennes ",
+      "email": "olivier.barais@univ-rennes.fr"
+    }
+  ],
+  "default_sent_folder": "Sent",
+  "rmtmmail": "olivier.barais+5ba373@rmilk.com",
+  "lthostport": "http://localhost:8081",
+  "calendaremail": "barais@irisa.fr",
+  "llm": {
+    "api_url": "https://ragarenn.eskemm-numerique.fr/sso/ch@t/api/chat/completions",
+    "api_key": "sk-66a096b9b2a9403b8f57d7f4f579681e",
+    "model": "ilaas/gemma-4-31b"
+  }
 }

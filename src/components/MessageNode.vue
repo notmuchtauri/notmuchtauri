@@ -134,26 +134,26 @@
           <div class="flex justify-between items-start mb-4">
             <div class="space-y-1 text-sm text-gray-600 dark:text-zinc-400">
               <div class="flex items-center gap-2">
-                <span class="font-semibold text-gray-700 dark:text-zinc-300">De :</span>
+                <span class="font-semibold text-gray-700 dark:text-zinc-300 w-8" >De :</span>
                 {{ message.from }}
               </div>
               <div class="flex items-center gap-2">
-                <span class="font-semibold text-gray-700 dark:text-zinc-300">À :</span>
+                <span class="font-semibold text-gray-700 dark:text-zinc-300 w-8">À :</span>
                 {{ message.to }}
               </div>
               <div v-if="message.cc" class="flex items-center gap-2">
-                <span class="font-semibold text-gray-700 dark:text-zinc-300">Cc :</span>
+                <span class="font-semibold text-gray-700 dark:text-zinc-300 w-20" >Cc :</span>
                 {{ message.cc }}
               </div>
             </div>
 
             <!-- Action Buttons -->
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2 w-200">
+    <!-- Boutons existants -->
               <button @click="replyFunction(message, message.subject, 'reply')"
                 class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 rounded-md transition-colors border border-blue-200 dark:border-blue-800">
                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M3 10h18M7 14l-5 5 5 5 5-5-5-5z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 14l-5 5 5 5 5-5-5-5z" />
                 </svg>
                 Répondre
               </button>
@@ -161,8 +161,7 @@
               <button @click="replyFunction(message, message.subject, 'reply-all')"
                 class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white hover:bg-gray-100 dark:text-zinc-400 dark:bg-zinc-800 dark:hover:bg-zinc-700 rounded-md transition-colors border border-gray-300 dark:border-zinc-700">
                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M12 4.5v15m6-6h.01M6 12h.01M12 12h.01" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.5v15m6-6h.01M6 12h.01M12 12h.01" />
                 </svg>
                 Répondre à tous
               </button>
@@ -170,10 +169,38 @@
               <button @click="replyFunction(message, message.subject, 'forward')"
                 class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white hover:bg-gray-100 dark:text-zinc-400 dark:bg-zinc-800 dark:hover:bg-zinc-700 rounded-md transition-colors border border-gray-300 dark:border-zinc-700">
                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                    d="M14 5l2 2m0 0l2-2m-2 2l-2-2m2 12l2-2m0 0l2 2m-2-2l-2 2m-7-14a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V6a2 2 0 00-2-2H7z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l2 2m0 0l2-2m-2 2l-2-2m2 12l2-2m0 0l2 2m-2-2l-2 2m-7-14a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V6a2 2 0 00-2-2H7z" />
                 </svg>
                 Transférer
+              </button>
+
+              <!-- NOUVEAUX BOUTONS -->
+              
+              <!-- Éditer comme nouveau (Icône Crayon/Document) -->
+              <button @click="editAsNew(message)"
+                class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white hover:bg-gray-100 dark:text-zinc-400 dark:bg-zinc-800 dark:hover:bg-zinc-700 rounded-md transition-colors border border-gray-300 dark:border-zinc-700">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Éditer comme nouveau 
+              </button>
+
+              <!-- Transformer en tâche (Icône Check-list) -->
+              <button v-if="config().rmtmmail && config().rmtmmail !==''" @click="convertToTask(message)"
+                class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white hover:bg-gray-100 dark:text-zinc-400 dark:bg-zinc-800 dark:hover:bg-zinc-700 rounded-md transition-colors border border-gray-300 dark:border-zinc-700">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+                Tâche
+              </button>
+
+              <!-- Transformer en RDV (Icône Calendrier) -->
+              <button v-if="config().calendaremail && config().calendaremail !==''" @click="convertToEvent(message)"
+                class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white hover:bg-gray-100 dark:text-zinc-400 dark:bg-zinc-800 dark:hover:bg-zinc-700 rounded-md transition-colors border border-gray-300 dark:border-zinc-700">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                RDV
               </button>
             </div>
           </div>
@@ -226,6 +253,7 @@
       <MessageNode v-for="reply in message.replies" :key="reply.id" :message="reply" :depth="depth + 1"
         :initially-expanded="false" />
     </div>
+
   </div>
   <!-- Modale de création de Tag (Téléportée à la racine de l'application) -->
   <Teleport to="body">
@@ -259,15 +287,29 @@
       </div>
     </div>
   </Teleport>
+<!-- La modale téléportée -->
+  <RtmTaskModal 
+    :is-open="isTaskModalOpen" 
+    :message="selectedMessageForTask" 
+    @close="isTaskModalOpen = false"
+    @task-created="onTaskCreated"
+  />
 
+  <IcsEventModal 
+    :is-open="isEventModalOpen" 
+    :message="selectedMessageForEvent" 
+    @close="isEventModalOpen = false"
+    @event-created="isEventModalOpen = false"
+  />
 </template>
 
 <script setup lang="ts">
 import { ref, computed, PropType, onMounted, watch, nextTick, inject } from 'vue'
-import type { AttachmentDto, MessageDto } from '../types' // Ajustez le chemin
+import type { AttachmentDto, MessageDto,AppConfig } from '../types' // Ajustez le chemin
 import { invoke } from '@tauri-apps/api/core'
 import { save } from '@tauri-apps/plugin-dialog' // ou '@tauri-apps/api/dialog' (v1)
-
+import RtmTaskModal from './RtmTaskModal.vue'
+import IcsEventModal from './IcsEventModal.vue'
 
 const props = defineProps({
   message: {
@@ -287,9 +329,21 @@ const props = defineProps({
 
 
 const replyFunction: (message: MessageDto, subject: string,
-  replyMode: 'reply' | 'reply-all' | 'forward' | 'new' | 'none'
+  replyMode: 'reply' | 'reply-all' | 'forward' | 'new' | 'editasnew' | 'none'
 ) => void = inject(/* key */ 'replyFunction')!
 
+const config:  ()=>AppConfig = inject(/* key */ 'appConfig')!
+
+
+
+/**
+ * Ouvre l'éditeur en reprenant le contenu exact du message
+ * pour l'envoyer comme un nouveau mail (utile pour réutiliser un modèle ou relancer)
+ */
+const editAsNew = (message: MessageDto) => {
+  // On passe le message original, son sujet tel quel, et le mode 'editasnew'
+  replyFunction(message, message.subject, 'editasnew')
+}
 
 // État local pour le toggle
 const isExpanded = ref(props.initiallyExpanded || props.message.tags.includes('unread'))
@@ -594,6 +648,29 @@ const snippet = computed(() => {
   const clean = text.replace(/\s+/g, ' ').trim()
   return clean.length > 80 ? clean.substring(0, 80) + '...' : clean || '(Contenu HTML / Sans texte)'
 })
+
+// (Vos autres imports et variables)
+const isTaskModalOpen = ref(false)
+const selectedMessageForTask = ref<MessageDto | null>(null)
+
+const convertToTask = (message: MessageDto) => {
+  selectedMessageForTask.value = message
+  isTaskModalOpen.value = true
+}
+
+const onTaskCreated = () => {
+  
+  console.log("Tâche RTM créée avec succès !")
+  // Optionnel : afficher une notification toast ici
+}
+
+const isEventModalOpen = ref(false)
+const selectedMessageForEvent = ref<MessageDto | null>(null)
+
+const convertToEvent = (message: MessageDto) => {
+  selectedMessageForEvent.value = message
+  isEventModalOpen.value = true
+}
 </script>
 
 <style scoped>
