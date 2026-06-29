@@ -235,7 +235,7 @@ function openThread(id: string) {
     id: newId,
     type: 'VIEW',
     replyMode: 'none',
-    title: `Thread ${id.substring(0, 8)}`,
+    title: `Thread ${id.substring(id.length-9>=0?id.length-9:0, id.length-1)}`,
     threadId: id,
     isHtml: true,
     message: null
