@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, provide } from "vue";
+import { ref, onMounted, onUnmounted, provide, computed } from "vue";
 import { invoke } from "@tauri-apps/api/core";
-import type { Message, FolderNode, AppConfig, MessageDto } from "./types";
+import type { Message, FolderNode, AppConfig, MessageDto, SearchResult } from "./types";
 import MailDetail from "./components/MailDetail.vue";
 import FolderTree from "./components/FolderTree.vue";
 import ComposeView from './components/ComposeView.vue';
@@ -20,6 +20,12 @@ const folderTree = ref<FolderNode[]>([]);
 const isScanning = ref(false);
 
 const isMailRootExpanded = ref(false); // Collapsé par défaut
+  const currentPage = ref(1)
+  const pageSize = ref( 100); // Fixed page size
+const totalResults = ref(0);
+
+// Computed property for total page count
+const totalPages = computed(() => Math.ceil(totalResults.value / pageSize.value!));
 
 
 // --- Logique de Redimensionnement (Splitters) ---
@@ -72,12 +78,20 @@ const getConfig:()=> AppConfig|undefined = ()=> {
 provide('appConfig',getConfig);
 
 
+
+function changePage(delta: number) {
+  currentPage.value += delta;
+  search( "newest-first", searchQuery.value, currentPage.value);
+}
+
+
 async function initApp() {
   try {
     // 1. Load configuration
     const config1 = await invoke<AppConfig>('get_config');
     config.value = config1;
     rootPath.value = config.value.root_mail_dir;
+    pageSize.value = config1.limit
 
     // 2. Initial scan if root path exists
     if (rootPath.value) {
@@ -116,10 +130,18 @@ function getRelativePath(absolutePath: string) {
   return relative;
 }
 
-async function search(sort: string = "newest-first", customQuery: string = "") {
+async function searchResetPage(sort: string = "newest-first", customQuery: string = "",page: number = 1) {
+  console.error("foo")
+  currentPage.value=1
+  search(sort,customQuery, page);
+
+}
+
+async function search(sort: string = "newest-first", customQuery: string = "",page: number = 1) {
   isLoading.value = true;
   error.value = null;
-  const limit = config.value?.limit;
+  const limit = config.value?.limit? config.value?.limit:1000;
+  console.error('pageSize', pageSize)
   let finalQuery = customQuery || searchQuery.value || "";
 
   if (currentPath.value) {
@@ -133,11 +155,18 @@ async function search(sort: string = "newest-first", customQuery: string = "") {
   }
 
   try {
-    messages.value = await invoke<Message[]>("search_messages", {
+    const response = await invoke<SearchResult>("search_messages", {
       query: finalQuery,
       limit,
-      sort
+      sort,
+      offset: (page - 1) * limit
     });
+
+
+
+     messages.value = response.messages;
+    totalResults.value = response.total;
+
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e);
   } finally {
@@ -157,6 +186,7 @@ function selectMessage(id: string) {
 
 function onFolderSelected(path: string) {
   currentPath.value = path;
+  currentPage.value=1
   search();
 }
 
@@ -254,6 +284,8 @@ const closeTab = (id: string): void => {
 // Quand l'utilisateur a cliqué sur "Enregistrer" dans la modale
 function onConfigUpdated(newConfig: AppConfig) {
   config.value = newConfig;
+  pageSize.value = config.value.limit 
+  searchResetPage();
   // Optionnel : Relancer un scanFolders ou recharger la racine si root_mail_dir a changé
 }
 
@@ -394,9 +426,9 @@ onUnmounted(() => {
       <div class="p-4 border-b border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-950">
         <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Search</div>
         <div class="flex gap-2">
-          <input v-model="searchQuery" @keyup.enter="search()" placeholder="Search messages..."
+          <input v-model="searchQuery" @keyup.enter="searchResetPage()" placeholder="Search messages..."
             class="w-full px-3 py-2 text-sm border rounded-md bg-gray-50 dark:bg-zinc-900 border-gray-300 dark:border-zinc-700 focus:ring-2 focus:ring-blue-500 outline-none" />
-          <button @click="search()"
+          <button @click="searchResetPage()"
             class="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm transition-colors">
             Search
           </button>
@@ -460,44 +492,83 @@ onUnmounted(() => {
     <!-- Volet 2: Liste des Threads -->
     <section class="flex-shrink-0 flex flex-col bg-white dark:bg-zinc-900" :style="{ width: pane2Width + 'px' }">
       <!-- Header de la liste -->
-      <div
-        class="p-3 border-b border-gray-200 dark:border-zinc-800 flex justify-between items-center bg-gray-50 dark:bg-zinc-900/50">
-        <span class="text-sm font-medium">{{ messages.length }} results</span>
- <div class="flex gap-2">
-          <!-- NOUVEAU : Bouton Rafraîchir / Forcer la recherche -->
+<!-- Entête unifiée (Infos, Actions, Pagination) -->
+      <div class="px-3 py-2 border-b border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-900/50 flex justify-between items-center gap-2">
+        
+        <!-- INFOS (Gauche) -->
+        <div class="flex items-center gap-2 text-xs text-gray-600 dark:text-zinc-400 font-medium truncate">
+          <span>{{ messages.length }} résultats</span>
+          <span v-if="messages.length > 0" class="hidden sm:inline border-l border-gray-300 dark:border-zinc-700 pl-2">
+            Page {{ currentPage }} / {{ totalPages }}
+          </span>
+        </div>
+
+        <!-- BOUTONS (Droite) -->
+        <div class="flex items-center gap-1">
+          
+          <!-- Refresh -->
           <button 
             @click="search()"
-            class="text-xs px-2 py-1 flex items-center gap-1 border rounded hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors text-gray-700 dark:text-zinc-300"
-            title="Rafraîchir les messages"
+            title="Rafraîchir"
             :disabled="isLoading"
-            :class="{'opacity-50 cursor-not-allowed': isLoading}"
+            class="p-1.5 text-gray-600 dark:text-zinc-300 rounded hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <!-- Icône de synchronisation/rafraîchissement qui tourne quand isLoading est true -->
-            <svg 
-              class="w-3.5 h-3.5" 
-              :class="{'animate-spin': isLoading}"
-              fill="none" stroke="currentColor" viewBox="0 0 24 24"
-            >
+            <svg class="w-4 h-4" :class="{'animate-spin': isLoading}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            Refresh
           </button>
 
-          <!-- Câblage du Select All -->
-          <button @click="selectAll"
-            class="text-xs px-2 py-1 border rounded hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors">
-            Select All
+          <!-- Select All -->
+          <button 
+            @click="selectAll"
+            title="Tout sélectionner"
+            class="p-1.5 text-gray-600 dark:text-zinc-300 rounded hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
           </button>
 
-          <!-- Bouton Delete -->
-          <button class="text-xs px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors">
-            Delete
-            <!-- Afficher le nombre d'éléments à supprimer -->
-            <span v-if="selectedIds.size > 0">({{ selectedIds.size }})</span>
+          <!-- Delete -->
+          <button 
+            title="Supprimer"
+            class="flex items-center gap-1 p-1.5 text-red-600 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 rounded transition-colors"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            <span v-if="selectedIds.size > 0" class="text-xs font-bold">{{ selectedIds.size }}</span>
           </button>
+
+          <!-- Séparateur vertical discret -->
+          <div class="w-px h-4 bg-gray-300 dark:bg-zinc-700 mx-1"></div>
+
+          <!-- Pagination: Précédent -->
+          <button
+            @click="changePage(-1)"
+            :disabled="currentPage === 1"
+            title="Page précédente"
+            class="p-1.5 text-gray-600 dark:text-zinc-300 rounded hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+
+          <!-- Pagination: Suivant -->
+          <button
+            @click="changePage(1)"
+            :disabled="currentPage * pageSize! >= totalResults"
+            title="Page suivante"
+            class="p-1.5 text-gray-600 dark:text-zinc-300 rounded hover:bg-gray-200 dark:hover:bg-zinc-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+
         </div>
-           </div>
-
+      </div>
       <div class="flex-1 overflow-y-auto relative">
         <div v-if="isLoading" class="p-8 text-center text-gray-500">Searching...</div>
         <div v-else-if="error" class="p-8 text-center text-red-500">{{ error }}</div>

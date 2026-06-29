@@ -18,7 +18,6 @@ impl FolderScanner {
     /// A directory is a Maildir if it contains 'cur', 'new', and 'tmp' subdirectories.
     pub fn scan(root: &Path) -> Result<Vec<FolderNode>, Box<dyn Error>> {
         let mut nodes = Vec::new();
-        println!("Scanning directory: {:?}", root);
         if let Ok(entries) = fs::read_dir(root) {
             for entry in entries {
                 let entry = entry?;

@@ -11,7 +11,7 @@ use folder_scan::{FolderNode, FolderScanner};
 use msmtp::{EmailPayload, MSMTPWrapper};
 use notmuch::{AddressMatch, Message, NotMuchWrapper, ReplyData};
 
-use crate::{llm::LLMWrapper, notmuch::ThreadDto};
+use crate::{llm::LLMWrapper, notmuch::{SearchResult, ThreadDto}};
 
 #[tauri::command]
 fn get_config() -> Result<AppConfig, String> {
@@ -34,11 +34,13 @@ fn search_messages(
     query: String,
     limit: Option<u32>,
     sort: Option<String>,
-) -> Result<Vec<Message>, String> {
+    offset: Option<i32>
+) -> Result<SearchResult, String> {
     let sort_ref = sort.as_deref();
-    let raw_data = NotMuchWrapper::search(&query, limit, sort_ref).map_err(|e| e.to_string())?;
+    let raw_data = NotMuchWrapper::search(&query, limit, sort_ref,offset).map_err(|e| e.to_string())?;
 
-    let flattened_messages = raw_data
+
+     let flattened_messages = raw_data.messages
         .into_iter()
         .map(|elem| Message {
             id: elem.thread,
@@ -52,8 +54,8 @@ fn search_messages(
             has_attachments: false,
         })
         .collect();
-
-    Ok(flattened_messages)
+        let res =         SearchResult { messages: flattened_messages, total: raw_data.total };
+    Ok(res)
 }
 
 #[tauri::command]
@@ -92,8 +94,8 @@ fn get_reply_data(
     NotMuchWrapper::get_reply_data(message_id, reply_mode, message).map_err(|e| e.to_string())
 }
 #[tauri::command]
-fn lookup_address(query: String, limit: usize) -> Result<Vec<AddressMatch>, String> {
-    NotMuchWrapper::lookup_address_limited(&query, limit).map_err(|e| e.to_string())
+async fn lookup_address(query: String, limit: usize) -> Result<Vec<AddressMatch>, String> {
+    NotMuchWrapper::lookup_address_limited(&query, limit).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]

@@ -589,7 +589,7 @@ const init = async () => {
         } else {
           form.body = replyData.bodyhtml
           if (editor.value) {
-            editor.value.commands.insertContent(`${replyData.bodyhtml}`)
+            editor.value.commands.setContent('<p></p>' + replyData.bodyhtml)
           }
 
         }
@@ -682,6 +682,36 @@ const splitEmails = (emailsStr: string): string[] => {
     .filter(e => e.length > 0)
 }
 
+/**
+ * Analyse le HTML généré par Tiptap et injecte les styles inline
+ * obligatoires pour les clients mail (ex: blockquote).
+ */
+const prepareHtmlForSending = (rawHtml: string): string => {
+  if (!rawHtml) return '';
+
+  // 1. On transforme le texte HTML en un véritable arbre DOM en mémoire
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(rawHtml, 'text/html');
+
+  // 2. Le style exact que vous souhaitez appliquer
+  const blockquoteStyle = "border-left:2px solid #1010ff;margin-left:5px;padding-left:5px;color:#000;font-weight:normal;font-style:normal;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-size:12pt;";
+
+  // 3. On trouve tous les <blockquote> et on applique le style
+  const blockquotes = doc.querySelectorAll('blockquote');
+  blockquotes.forEach(bq => {
+    // Si la balise avait déjà un style, on le conserve et on concatène le nouveau
+    const currentStyle = bq.getAttribute('style') || '';
+    const separator = currentStyle && !currentStyle.trim().endsWith(';') ? ';' : '';
+    
+    bq.setAttribute('style', `${currentStyle}${separator}${blockquoteStyle}`);
+  });
+
+  // (Optionnel) : Vous pourriez faire la même chose ici pour les balises <img>, <a>, etc.
+
+  // 4. On retourne le HTML propre et modifié
+  return doc.body.innerHTML;
+}
+
 const sendEmail = async () => {
   try {
     isSending.value = true
@@ -703,13 +733,18 @@ const sendEmail = async () => {
       mimeType: null
     }))
 
+    let finalBody= form.body;
+    if (props.isHtml) {
+      finalBody = prepareHtmlForSending(form.body);
+    }
+
     const payload = {
       from: fromAddress,
       to: splitEmails(form.to),
       cc: splitEmails(form.cc),
       bcc: splitEmails(form.bcc),
       subject: form.subject,
-      body: form.body,
+      body: finalBody,
       isHtml: props.isHtml,
       attachments: attachmentPayload,
       account: form.account,
@@ -980,6 +1015,28 @@ onUnmounted(() => {
   font-size: 10px;
   color: #374151;
   /* gray-700 */
+}
+
+/* 
+  Style global pour les citations dans Tiptap 
+  (S'applique au blockquote natif généré par l'éditeur) 
+*/
+:deep(.ProseMirror blockquote) {
+  border-left: 3px solid #3b82f6 !important; /* Barre bleue (Tailwind blue-500) */
+  padding-left: 1rem !important;            /* Espace entre la barre et le texte */
+  margin-left: 0.5rem !important;           /* Légère indentation globale */
+  margin-right: 0 !important;
+  color: #4b5563 !important;  
+  margin-top: 0 !important;             
+    margin-bottom: 0 !important;              /* Texte légèrement grisé (gray-600) */
+}
+
+/* Optionnel : Assurer que les paragraphes dans la citation ne cassent pas les marges */
+:deep(.ProseMirror blockquote p) {
+  margin-bottom: 0.2rem;
+}
+:deep(.ProseMirror blockquote p:last-child) {
+  margin-bottom: 0;
 }
 
 /* Retire les marges de paragraphe en mode texte brut pour simuler un textarea */

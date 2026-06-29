@@ -363,7 +363,7 @@ const saveConfig = async () => {
     };
 
     // Appel à la commande backend Rust
-    await invoke('set_config', { config: payloadToSave });
+    await invoke('save_config', { config: payloadToSave });
 
     emit('config-saved', payloadToSave);
     closeModal();

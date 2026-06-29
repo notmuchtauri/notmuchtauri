@@ -1,11 +1,13 @@
 use lettre::message::{Attachment, Message, MultiPart, SinglePart};
 use serde::Deserialize;
-use tokio::time::interval;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::Duration;
+use tokio::time::interval;
+
+use crate::notmuch::NotMuchWrapper;
 
 // --- RAW NOTMUCH MODELS ---
 
@@ -42,12 +44,11 @@ impl MSMTPWrapper {
     }
 
     /// Tente d'envoyer un e-mail brut via msmtp. Retourne true si succès.
-    fn send_raw_email(raw_email: &[u8], account:Option<String>) -> bool {
-         let mut cmd =  Command::new("msmtp");
-        cmd .arg("-t");
+    fn send_raw_email(raw_email: &[u8], account: Option<String>) -> bool {
+        let mut cmd = Command::new("msmtp");
+        cmd.arg("-t");
 
-                if let Some(account) = account {
-            println!("Using msmtp account: {}", account);
+        if let Some(account) = account {
             cmd.arg("-a").arg(account);
         }
 
@@ -184,61 +185,28 @@ impl MSMTPWrapper {
 
         let email_bytes = email.formatted();
 
-        // 5. Exécution de msmtp
-//        let mut cmd = Command::new("msmtp");
-//        cmd.arg("-t"); // Demande à msmtp d'extraire les destinataires (To, Cc, Bcc) des headers MIME
+        let sent_successfully = MSMTPWrapper::send_raw_email(&email_bytes, payload.account);
 
-/*         if let Some(account) = payload.account {
-            println!("Using msmtp account: {}", account);
-            cmd.arg("-a").arg(account);
-        }*/
+        if sent_successfully {
+            // 2a. Succès : Sauvegarde dans Sent
+            MSMTPWrapper::insert_to_notmuch(
+                &email_bytes,
+                &payload.sent_folder,
+                &["+sent", "-unread", "-new"],
+            );
 
-   /*     let mut child = cmd
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| format!("Impossible de lancer msmtp: {}", e))?; */
-
-        // Écriture du mail généré dans l'entrée standard de msmtp
-/*         if let Some(mut stdin) = child.stdin.take() {
-            stdin
-                .write_all(&email_bytes)
-                .map_err(|e| format!("Erreur d'écriture dans stdin: {}", e))?;
+            println!("Email envoyé avec succès");
+        } else {
+            // 2b. Échec (pas de réseau) : Sauvegarde dans Outbox
+            MSMTPWrapper::insert_to_notmuch(
+                &email_bytes,
+                "Outbox",
+                &["+outbox", "-unread", "-new"],
+            );
+            // On retourne quand même "Ok" au frontend pour ne pas bloquer l'UI,
+            // mais on prévient que c'est dans la boîte d'envoi.
+            println!("Réseau indisponible. L'e-mail a été placé dans la boîte d'envoi (Outbox).")
         }
-
-        // Attente du résultat
-        let output = child
-            .wait_with_output()
-            .map_err(|e| format!("Erreur d'attente de msmtp: {}", e))?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("Erreur msmtp (code {}): {}", output.status, stderr));
-        }
-
-        // 3. Sauvegarde dans Notmuch
-        // On récupère le contenu brut de l'e-mail sous forme de Vec<u8> (les octets exacts envoyés)
-        let raw_email_bytes = email.formatted();
-
-        println!("Sauvegarde dans Notmuch...");
-        MSMTPWrapper::save_to_notmuch(&raw_email_bytes, payload.sent_folder)?;
-        println!("Sauvegarde réussie !");
-        */
-    let sent_successfully = MSMTPWrapper::send_raw_email(&email_bytes,payload.account);
-
-    if sent_successfully {
-        // 2a. Succès : Sauvegarde dans Sent
-        MSMTPWrapper::insert_to_notmuch(&email_bytes, &payload.sent_folder, &["+sent", "-unread", "-new"]);
-        
-       println!("Email envoyé avec succès");
-    } else {
-        // 2b. Échec (pas de réseau) : Sauvegarde dans Outbox
-        MSMTPWrapper::insert_to_notmuch(&email_bytes, "Outbox", &["+outbox", "-unread", "-new"]);
-        // On retourne quand même "Ok" au frontend pour ne pas bloquer l'UI, 
-        // mais on prévient que c'est dans la boîte d'envoi.
-        println!("Réseau indisponible. L'e-mail a été placé dans la boîte d'envoi (Outbox).")
-    }
 
         Ok(())
     }
@@ -278,168 +246,107 @@ impl MSMTPWrapper {
             )
             .map_err(|e| format!("Erreur de construction de l'email: {}", e))?;
 
-        // 3. Envoi via msmtp
-
-        // 5. Exécution de msmtp
-       /* let mut cmd = Command::new("msmtp");
-        cmd.arg("-t"); // Demande à msmtp d'extraire les destinataires (To, Cc, Bcc) des headers MIME
-
-        let mut child = cmd
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| format!("Impossible de lancer msmtp: {}", e))?;
-         */
-
         let email_bytes = email.formatted();
         let sent_successfully = MSMTPWrapper::send_raw_email(&email_bytes, None);
-    if sent_successfully {
-        // 2a. Succès : Sauvegarde dans Sent
-        MSMTPWrapper::insert_to_notmuch(&email_bytes, sentfolder, &["+sent", "-unread", "-new"]);
-        
-       println!("Email envoyé avec succès");
-    } else {
-        // 2b. Échec (pas de réseau) : Sauvegarde dans Outbox
-        MSMTPWrapper::insert_to_notmuch(&email_bytes, "Outbox", &["+outbox", "-unread", "-new"]);
-        // On retourne quand même "Ok" au frontend pour ne pas bloquer l'UI, 
-        // mais on prévient que c'est dans la boîte d'envoi.
-        println!("Réseau indisponible. L'e-mail a été placé dans la boîte d'envoi (Outbox).")
-    }
+        if sent_successfully {
+            // 2a. Succès : Sauvegarde dans Sent
+            MSMTPWrapper::insert_to_notmuch(
+                &email_bytes,
+                sentfolder,
+                &["+sent", "-unread", "-new"],
+            );
 
-
-        // Écriture du mail généré dans l'entrée standard de msmtp
-/*         if let Some(mut stdin) = child.stdin.take() {
-            stdin
-                .write_all(&email_bytes)
-                .map_err(|e| format!("Erreur d'écriture dans stdin: {}", e))?;
+            println!("Email envoyé avec succès");
+        } else {
+            // 2b. Échec (pas de réseau) : Sauvegarde dans Outbox
+            MSMTPWrapper::insert_to_notmuch(
+                &email_bytes,
+                sentfolder,
+                &["+outbox", "-unread", "-sent", "-new"],
+            );
+            // On retourne quand même "Ok" au frontend pour ne pas bloquer l'UI,
+            // mais on prévient que c'est dans la boîte d'envoi.
+            println!("Réseau indisponible. L'e-mail a été placé dans la boîte d'envoi (Outbox).")
         }
 
-        // Attente du résultat
-        let output = child
-            .wait_with_output()
-            .map_err(|e| format!("Erreur d'attente de msmtp: {}", e))?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("Erreur msmtp (code {}): {}", output.status, stderr));
-        }
-
-        // 3. Sauvegarde dans Notmuch
-        // On récupère le contenu brut de l'e-mail sous forme de Vec<u8> (les octets exacts envoyés)
-        let raw_email_bytes = email.formatted();
-
-        println!("Sauvegarde dans Notmuch...");
-        MSMTPWrapper::save_to_notmuch(&raw_email_bytes, sentfolder.to_string())?;
-        println!("Sauvegarde réussie !");
-*/
         Ok(())
     }
 
-    /// Fonction utilitaire pour injecter l'e-mail brut dans Notmuch
-  /*   fn save_to_notmuch(raw_email: &[u8], folder: String) -> Result<(), String> {
-        // On configure la commande `notmuch insert`
-        let mut child = Command::new("notmuch")
-            .args([
-                "insert",
-                &format!("--folder={}", folder),
-                "--create-folder",
-                "-unread", // On retire le tag unread
-                "-new",    // On retire le tag new
-                "+sent",   // (Optionnel) on ajoute un tag 'sent' pour le retrouver facilement
-            ])
-            // On indique qu'on va écrire dans l'entrée standard de la commande (stdin)
-            .stdin(Stdio::piped())
-            // On redirige la sortie d'erreur au cas où pour le débogage
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| format!("Erreur lors du lancement de notmuch: {}", e))?;
-
-        // On écrit les octets de l'e-mail brut dans le stdin du processus notmuch
-        if let Some(mut stdin) = child.stdin.take() {
-            stdin
-                .write_all(raw_email)
-                .map_err(|e| format!("Erreur d'écriture dans stdin: {}", e))?;
-        }
-
-        // On attend que notmuch termine son travail
-        let output = child
-            .wait_with_output()
-            .map_err(|e| format!("Erreur lors de l'attente du processus: {}", e))?;
-
-        if output.status.success() {
-            Ok(())
-        } else {
-            let err_msg = String::from_utf8_lossy(&output.stderr);
-            Err(format!(
-                "notmuch a échoué avec le code {:?}. Erreur : {}",
-                output.status.code(),
-                err_msg
-            ))
-        }
-    }*/
-
     pub async fn process_outbox_daemon() {
-    // Vérifie la boîte d'envoi toutes les 5 minutes
-    let mut ticker = interval(Duration::from_secs(5 * 60));
+        // Vérifie la boîte d'envoi toutes les 5 minutes
+        let mut ticker = interval(Duration::from_secs(5 * 60));
 
-    loop {
-        ticker.tick().await;
-        // println!("Vérification de la boîte d'envoi (Outbox)...");
+        loop {
+            ticker.tick().await;
 
-        // 1. Chercher les IDs des messages ayant le tag outbox
-        let search_output = match Command::new("notmuch")
-            .args(["search", "--output=messages", "tag:outbox"])
-            .output() 
-        {
-            Ok(out) => out,
-            Err(_) => continue,
-        };
-
-        let msgs_str = String::from_utf8_lossy(&search_output.stdout);
-        
-        for msg_id in msgs_str.lines() {
-            let msg_id = msg_id.trim();
-            if msg_id.is_empty() { continue; }
-
-            // 2. Extraire le contenu brut du message
-            let raw_output = Command::new("notmuch")
-                .args(["show", "--format=raw", msg_id])
+            // 1. Chercher les IDs des messages ayant le tag outbox (Asynchrone)
+            let search_output = match tokio::process::Command::new("notmuch")
+                .args(["search", "--output=messages", "tag:outbox"])
                 .output()
-                .unwrap_or_else(|_| std::process::Output {
-                    status: Default::default(),
-                    stdout: Vec::new(),
-                    stderr: Vec::new()
-                });
+                .await
+            {
+                Ok(out) => out,
+                Err(e) => {
+                    eprintln!("Daemon Outbox: Erreur lors de la recherche notmuch - {}", e);
+                    continue;
+                }
+            };
 
-            if raw_output.stdout.is_empty() { continue; }
+            let msgs_str = String::from_utf8_lossy(&search_output.stdout);
 
-            // 3. Tenter l'envoi
-            if MSMTPWrapper::send_raw_email(&raw_output.stdout,None) {
-                // SUCCESS ! L'email est parti.
-                // println!("Email {} envoyé avec succès depuis l'Outbox !", msg_id);
+            for msg_id_raw in msgs_str.lines() {
+                let msg_id = msg_id_raw.trim();
+                if msg_id.is_empty() {
+                    continue;
+                }
 
-                // 4. On récupère le(s) chemin(s) physique(s) du fichier dans Outbox
-                if let Ok(files_out) = Command::new("notmuch")
-                    .args(["search", "--output=files", msg_id])
-                    .output() 
+                println!("Daemon Outbox: Tentative d'envoi pour {}", msg_id);
+
+                // 2. Extraire le contenu brut du message (Asynchrone)
+                let raw_output = match tokio::process::Command::new("notmuch")
+                    .args(["show", "--format=raw", msg_id])
+                    .output()
+                    .await
                 {
-                    // 5. On l'insère physiquement dans "Sent"
-                    MSMTPWrapper::insert_to_notmuch(&raw_output.stdout, "Sent", &["+sent", "-unread", "-outbox"]);
-
-                    // 6. On supprime les vieux fichiers de Outbox
-                    let files_str = String::from_utf8_lossy(&files_out.stdout);
-                    for file_path in files_str.lines() {
-                        let _ = fs::remove_file(file_path.trim());
+                    Ok(out) if !out.stdout.is_empty() => out,
+                    _ => {
+                        eprintln!(
+                            "Daemon Outbox: Impossible d'extraire le contenu de {}",
+                            msg_id
+                        );
+                        continue;
                     }
+                };
 
-                    // 7. On informe notmuch que la base a changé
-                    let _ = Command::new("notmuch").arg("new").output();
+                // 3. Tenter l'envoi
+                // Si votre méthode `send_raw_email` utilise std::process::Command (synchrone),
+                // il FAUT l'exécuter dans un thread de blocage pour ne pas figer Tauri.
+                let raw_bytes = raw_output.stdout.clone();
+                let send_success = tokio::task::spawn_blocking(move || {
+                    MSMTPWrapper::send_raw_email(&raw_bytes, None)
+                })
+                .await
+                .unwrap_or(false);
+
+                if send_success {
+                    println!("Daemon Outbox: Succès ! Email {} expédié.", msg_id);
+
+                    // 4. Mettre à jour les tags (Idem, on encapsule dans spawn_blocking si vos wrappers sont synchrones)
+                    let msg_id_clone = msg_id.to_string();
+                    tokio::task::spawn_blocking(move || {
+                        // Nettoie l'ID de potentiels préfixes de notmuch si nécessaire
+                        NotMuchWrapper::modify_message_tag(&msg_id_clone, "outbox", "remove");
+                        NotMuchWrapper::modify_message_tag(&msg_id_clone, "sent", "add");
+                    })
+                    .await
+                    .unwrap_or(());
+                } else {
+                    eprintln!(
+                        "Daemon Outbox: Échec de l'envoi pour {}. Nouvel essai au prochain cycle.",
+                        msg_id
+                    );
                 }
             }
         }
     }
 }
-}
-
-

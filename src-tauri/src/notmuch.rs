@@ -3,9 +3,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::error::Error;
 use std::fs;
-use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
-
+use tokio::io::{AsyncBufReadExt};
 // --- RAW NOTMUCH MODELS ---
 #[derive(Serialize, Deserialize)]
 pub struct AddressMatch {
@@ -123,6 +122,8 @@ pub struct MessagElement {
     pub tags: Vec<String>,
 }
 
+
+
 pub type Messag = Vec<MessagElement>;
 
 /// Clean representation for the Frontend as defined in docs/arch/data-model.md.
@@ -149,6 +150,22 @@ pub struct ReplyData {
     pub bodyhtml: String,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+  pub struct SearchResult {
+      pub messages: Vec<Message>,
+      pub total: usize,
+  }
+
+
+  #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+  pub struct SearchResultMessagInternal {
+      pub messages: Vec<MessagElement>,
+      pub total: usize,
+  }
+
+  
 pub struct NotMuchWrapper;
 
 impl NotMuchWrapper {
@@ -156,11 +173,35 @@ impl NotMuchWrapper {
         Command::new("notmuch").arg("--version").output().is_ok()
     }
 
+     /// Returns the total number of messages matching a query using `notmuch count`
+      pub fn count_messages(query: &str) -> Result<usize, Box<dyn Error>> {
+          let output = Command::new("notmuch")
+              .arg("count")
+              .arg(query)
+              .output()?;
+
+          if !output.status.success() {
+              return Err("notmuch count failed".into());
+          }
+
+          let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+          // notmuch count returns a simple number as a string
+          let count = stdout.parse::<usize>()
+              .map_err(|_| "Failed to parse count result as number")?;
+
+          Ok(count)
+      }
+
+
     pub fn search(
         query: &str,
         limit: Option<u32>,
         sort: Option<&str>,
-    ) -> Result<Messag, Box<dyn Error>> {
+        offset:Option<i32>
+    ) -> Result<SearchResultMessagInternal, Box<dyn Error>> {
+
+        let total = Self::count_messages(query)?;
         let mut cmd = Command::new("notmuch");
         cmd.arg("search").arg("--format=json");
 
@@ -171,9 +212,16 @@ impl NotMuchWrapper {
         if let Some(s) = sort {
             cmd.arg("--sort").arg(s);
         }
+        if let Some(offset1) = offset {
+            if offset1>0 { 
+                cmd.arg("--offset").arg(offset1.to_string());
+            }
+        }
+
+        
 
         cmd.arg(query);
-        println!("Executing command: {:?}", query);
+//        println!("Executing command: {:?}", query);
 
         let output: std::process::Output = cmd.output()?;
 
@@ -183,12 +231,14 @@ impl NotMuchWrapper {
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
-        if stdout.trim().is_empty() {
-            return Ok(vec![]);
+         if stdout.trim().is_empty() {
+            return Ok(SearchResultMessagInternal { messages: vec![], total: 0 });
         }
 
         let messages: Messag = serde_json::from_str(&stdout)?;
-        Ok(messages)
+         let total = total;
+        return Ok(SearchResultMessagInternal { messages: messages, total: total });
+
     }
 
     pub fn get_thread_details(thread_id: &str) -> Result<Vec<ThreadDto>, Box<dyn Error>> {
@@ -260,10 +310,6 @@ impl NotMuchWrapper {
     }
 
     pub fn modify_message_tag(message_id: &str, tag: &str, action: &str) -> Result<(), String> {
-        println!(
-            "Modifying tag '{}' for message ID '{}' with action '{}'",
-            tag, message_id, action
-        );
 
         // action doit être "add" ou "remove"
         let prefix = match action {
@@ -403,7 +449,7 @@ impl NotMuchWrapper {
     }
 
     /// Performs a lookup with a hard limit on the number of processed lines
-    pub fn lookup_address_limited(
+   /* pub fn lookup_address_limited(
         query: &str,
         line_limit: usize,
     ) -> Result<Vec<AddressMatch>, Box<dyn Error>> {
@@ -444,6 +490,51 @@ impl NotMuchWrapper {
         let _ = child.kill();
 
         Ok(matches)
+    }*/
+
+ pub async fn lookup_address_limited(
+        query: &str,
+        line_limit: usize,
+    ) -> Result<Vec<AddressMatch>, Box<dyn Error>> {
+        
+        // 1. Spawn the process asynchronously and pipe stdout
+        let mut child = tokio::process::Command::new("notmuch-addrlookup")
+            .arg(query)
+            .stdout(Stdio::piped())
+            .spawn()?;
+
+        // 2. Create an async buffered reader from the stdout handle
+        let stdout_handle = child.stdout.take().ok_or("Failed to open stdout")?;
+        let reader = tokio::io::BufReader::new(stdout_handle);
+        let mut lines = reader.lines(); // Fourni par le trait AsyncBufReadExt
+
+        let mut matches = Vec::new();
+        let mut lines_processed = 0;
+
+        // 3. Iterate through lines asynchronously
+        // next_line() attend (await) sans bloquer le thread principal
+        while let Some(line) = lines.next_line().await? {
+            if lines_processed >= line_limit {
+                break; // Stop reading after n lines
+            }
+
+            if line.trim().is_empty() {
+                continue;
+            }
+
+            // Parse the line into AddressMatch
+            if let Some(addr) = Self::parse_addr_line(&line) {
+                matches.push(addr);
+            }
+
+            lines_processed += 1;
+        }
+
+        // 4. Kill the child process asynchronously
+        // Note: Dans tokio, kill() est une méthode asynchrone qui nécessite .await
+        let _ = child.kill().await;
+
+        Ok(matches)
     }
 
     /// Helper to parse the notmuch-addrlookup format: "Name <email>" or "email"
@@ -476,18 +567,17 @@ pub fn prepare_reply_body(original_message: &Message) -> String {
     // We wrap the original content in a styled HTML block
     // Using a simple but clean style that works across most email clients
     format!(
-        r#"<div data-marker="__HEADERS__">
-            <blockquote style="border-left:2px solid #1010FF;margin-left:5px;padding-left:5px;color:#000;font-weight:normal;font-style:normal;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-size:12pt;">
-            <b>De: </b> {} <br>
-            <b>À: </b> {} </br>
+        r#"
+            <blockquote >
+            <b>De: </b> {}<br> 
+            <b>À: </b> {} <br>
             <b>Envoyé: </b>{}<br>
-            <b>Objet: </b>{}<br></blockquote></div>
-            <div data-marker="__QUOTED_TEXT__">
-            <blockquote style="border-left:2px solid #1010FF;margin-left:5px;padding-left:5px;color:#000;font-weight:normal;font-style:normal;text-decoration:none;font-family:Helvetica,Arial,sans-serif;font-size:12pt;">
+            <b>Objet: </b>{}</blockquote>
+            <blockquote ">
             {}
-            </blockquote></div>
+            </blockquote>
             "#,
-        from_display, to_display, date_display, subject_display, body_content
+        from_display.trim(), to_display.trim(), date_display.trim(), subject_display.trim(), body_content.trim()
     )
 }
 

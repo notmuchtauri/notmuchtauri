@@ -63,7 +63,7 @@ impl ConfigManager {
         // In a real Tauri app, we'd use tauri::api::path::app_config_dir()
         // For now, we look for a simple config.json in the current directory or home
         let config_path = PathBuf::from("config.json");
-        println!("Loading config from: {:?}", config_path.as_path().display());
+       // println!("Loading config from: {:?}", config_path.as_path().display());
         if !config_path.exists() {
             return Ok(AppConfig::default());
         }

@@ -48,6 +48,11 @@ export interface AppConfig {
   shortcuts: ShortcuConfig[];
 }
 
+  export interface SearchResult {
+       messages: Message[],
+      total: number,
+  }
+
 export interface Thread {
   id: string;
   messages: string[];
