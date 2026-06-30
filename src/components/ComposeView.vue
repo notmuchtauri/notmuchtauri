@@ -126,9 +126,9 @@
         <input v-model="form.subject" type="text"
           class="flex-1 font-semibold bg-transparent border-none focus:ring-0 text-gray-800 p-1" />
 
-        <div v-if="editor && !props.isHtml && config?.lthostport && config?.lthostport !==''" class="flex items-center space-x-3 ml-2">
+        <div v-if="editor" class="flex items-center space-x-3 ml-2">
 
-                                <select v-model="spellLanguage" class="text-xs border border-gray-300 rounded p-1">
+                                <select v-if="editor && !props.isHtml && config?.lthostport && config?.lthostport !==''" v-model="spellLanguage" class="text-xs border border-gray-300 rounded p-1">
               <option value="fr">Français</option>
               <option value="en-US">English</option>
             </select>
