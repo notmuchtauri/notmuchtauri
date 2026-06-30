@@ -197,8 +197,8 @@ onMounted(async () => {
   document.addEventListener('click', closeContextMenu);
 
    // 2. Écoute l'événement émis par Rust
-  unlistenMailSync = await listen("mail-synced", () => {
-    console.log("📨 Événement mail-synced reçu depuis Rust ! Lancement de la recherche...");
+  unlistenMailSync = await listen("mail-synced", (accountName) => {
+    console.log("📨 Événement mail-synced reçu depuis Rust ! Lancement de la recherche...", accountName.payload);    
     
     // On appelle simplement la fonction search existante !
     // Elle va récupérer les nouveaux mails et réinitialiser le timer automatique.
@@ -436,6 +436,14 @@ const deleteThread = async ()=> {
     search();
     selectedIds.value.clear()
 
+}
+
+const markAsRead = (messageId:string)=>{
+  messages.value.forEach((msg) => {
+    if (msg.id === messageId) {
+      msg.tags = msg.tags.filter(tag => tag.toLowerCase() !== 'unread');
+    }
+  });
 }
 
 </script>
@@ -682,6 +690,7 @@ const deleteThread = async ()=> {
               v-if="tab.type === 'VIEW'" 
               :message-id="tab.threadId!" 
               :exclude="searchQuery.includes('tag:deleted') || searchQuery.includes('tag:spam')"
+              @mark-as-read="markAsRead"
             />
             <ComposeView 
               v-else 

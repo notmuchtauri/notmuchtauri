@@ -1,4 +1,3 @@
-use std::fmt::Pointer;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::process::Command;
@@ -125,7 +124,7 @@ fn get_password(account: &ImapAccount) -> Result<String, String> {
 fn trigger_sync(account_name: &str, app_handle: &AppHandle) {
     println!("[IDLE: {}] ⚡ RÉVEIL ! Nouveau message détecté. Lancement de mbsync...", account_name);
     
-    let sync_cmd = "sem --fg -j 1 --id mbsync '/usr/bin/mbsync -a' ; sem -j 1 --fg --id notmuch '/usr/bin/notmuch new --quiet'";
+    let sync_cmd = "sem --fg -j 1 --id mbsync '/usr/bin/mbsync -l '".to_owned() +  account_name + " ; sem -j 1 --fg --id notmuch '/usr/bin/notmuch new --quiet'";
     
     let status = Command::new("sh")
         .arg("-c")
@@ -136,7 +135,7 @@ fn trigger_sync(account_name: &str, app_handle: &AppHandle) {
         Ok(s) => {
             if s.success() {
                 println!("[IDLE: {}] ✅ Synchronisation (mbsync + notmuch) terminée avec succès.", account_name);
-                if let Err(e) = app_handle.emit("mail-synced", ()) {
+                if let Err(e) = app_handle.emit("mail-synced", account_name) {
                     eprintln!("[IDLE: {}] ❌ Erreur lors de l'émission de l'événement Vue.js: {}", account_name, e);
                 } else {
                     println!("[IDLE: {}] 📡 Événement 'mail-synced' envoyé à l'interface.", account_name);
@@ -217,7 +216,7 @@ fn start_idle_worker(account: ImapAccount, app_handle: AppHandle) {
         loop {
             // C'est ici que ça bloquait ou échouait pour vous.
             match session.idle() {
-                Ok(mut idle) => {
+                Ok( idle) => {
                     println!("[IDLE: {}] ⏳ En attente de notifications du serveur...", acc_name);
                     
                     match idle.wait_keepalive() {
