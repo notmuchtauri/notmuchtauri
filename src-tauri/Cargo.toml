@@ -17,6 +17,8 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+
+
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
@@ -27,10 +29,13 @@ tauri-plugin-dialog = "2"
 lettre = "0.11.22"
 tauri-plugin-http = "2"
 tokio = { version = "1.52.3", features = ["full"] }
-
-imap = "2.4.1"
-native-tls = "0.2"
+value-bag = "1.12.0"
+async-imap = "0.11.2"
+async-native-tls = "0.5.0"
+futures = "0.3.28"
 dirs = "6.0"
+async-std = { version = "1.12.0", features = [ "attributes"] }
+
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

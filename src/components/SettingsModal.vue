@@ -234,6 +234,8 @@ const isOpen = ref(false);
 const isSaving = ref(false);
 
 const localConfig = ref<AppConfig>({
+  root_mail_dir:'',
+  notmuch_config_path:'',
    mbsyncrc_path: '',
   msmtprc_path: '',
   limit: 1000,
@@ -312,6 +314,9 @@ const saveConfig = async () => {
     const payloadToSave: AppConfig = {
       mbsyncrc_path: localConfig.value.mbsyncrc_path || '',
       msmtprc_path: localConfig.value.msmtprc_path || '',
+      root_mail_dir: localConfig.value.root_mail_dir || '',
+      notmuch_config_path: localConfig.value.notmuch_config_path || '',
+
       limit: localConfig.value.limit || 1000,
       default_sent_folder: localConfig.value.default_sent_folder || 'Sent',
       calendaremail: localConfig.value.calendaremail || '',

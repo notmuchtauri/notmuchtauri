@@ -1,9 +1,14 @@
+use async_imap::extensions::idle::IdleResponse::*; // <-- IMPORT CRUCIAL
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::process::Command;
-use std::thread;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
+use tokio::process::Command;
+use tokio::time;
+use async_imap::extensions::idle::IdleResponse::*;
+use futures::StreamExt;
+
+use async_std::{net::TcpStream, task, task::sleep};
 
 #[derive(Debug, Clone)]
 struct ImapAccount {
@@ -14,29 +19,21 @@ struct ImapAccount {
     pass: Option<String>,
 }
 
+// ---------------------------------------------------------
+// PARSING DE LA CONFIGURATION (~/.mbsyncrc)
+// ---------------------------------------------------------
+
 fn parse_mbsyncrc() -> Vec<ImapAccount> {
-    println!("[IDLE] 🔍 Début de la lecture de ~/.mbsyncrc...");
     let mut accounts = Vec::new();
-    
     let home_dir = match dirs::home_dir() {
         Some(dir) => dir,
-        None => {
-            eprintln!("[IDLE] ❌ Impossible de trouver le dossier personnel.");
-            return accounts;
-        }
+        None => return accounts,
     };
     
     let mbsyncrc_path = home_dir.join(".mbsyncrc");
-
     let file = match File::open(&mbsyncrc_path) {
-        Ok(f) => {
-            println!("[IDLE] 📄 Fichier ~/.mbsyncrc ouvert avec succès.");
-            f
-        }
-        Err(e) => {
-            eprintln!("[IDLE] ❌ Fichier ~/.mbsyncrc introuvable ou illisible : {}", e);
-            return accounts;
-        }
+        Ok(f) => f,
+        Err(_) => return accounts,
     };
 
     let reader = BufReader::new(file);
@@ -56,12 +53,7 @@ fn parse_mbsyncrc() -> Vec<ImapAccount> {
         match key {
             "IMAPAccount" => {
                 if let Some(acc) = current_account.take() {
-                    if is_imaps { 
-                        println!("[IDLE] ✅ Compte IMAPS validé pour IDLE : {}", acc.name);
-                        accounts.push(acc); 
-                    } else {
-                        println!("[IDLE] ⚠️ Compte ignoré (pas de SSLType IMAPS) : {}", acc.name);
-                    }
+                    if is_imaps { accounts.push(acc); }
                 }
                 current_account = Some(ImapAccount {
                     name: val.to_string(),
@@ -82,176 +74,222 @@ fn parse_mbsyncrc() -> Vec<ImapAccount> {
     }
 
     if let Some(acc) = current_account {
-        if is_imaps { 
-            println!("[IDLE] ✅ Compte IMAPS validé pour IDLE : {}", acc.name);
-            accounts.push(acc); 
-        }
+        if is_imaps { accounts.push(acc); }
     }
-
-    println!("[IDLE] 🏁 Parsing terminé. {} compte(s) compatible(s) trouvé(s).", accounts.len());
     accounts
 }
 
-fn get_password(account: &ImapAccount) -> Result<String, String> {
-    println!("[IDLE: {}] 🔑 Récupération du mot de passe...", account.name);
-    
+// ---------------------------------------------------------
+// FONCTIONS ASYNCHRONES (MOT DE PASSE ET SYNCHRO)
+// ---------------------------------------------------------
+
+async fn get_password(account: &ImapAccount) -> Result<String, String> {
     if let Some(pass) = &account.pass {
-        println!("[IDLE: {}] 🔑 Mot de passe trouvé en clair dans la config.", account.name);
         return Ok(pass.clone());
     }
 
     if let Some(pass_cmd) = &account.pass_cmd {
-        println!("[IDLE: {}] 🔑 Exécution de PassCmd : {}", account.name, pass_cmd);
         let output = Command::new("sh")
             .arg("-c")
             .arg(pass_cmd)
             .output()
+            .await
             .map_err(|e| format!("Erreur exécution shell: {}", e))?;
 
         if output.status.success() {
             let pass = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            println!("[IDLE: {}] 🔑 PassCmd exécutée avec succès.", account.name);
             return Ok(pass);
         } else {
-            let err_str = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("PassCmd a échoué avec le code {:?}. Stderr: {}", output.status.code(), err_str));
+            return Err("PassCmd a échoué.".into());
         }
     }
 
-    Err("Aucune directive Pass ou PassCmd configurée.".to_string())
+    Err("Aucune directive Pass ou PassCmd configurée.".into())
 }
 
-fn trigger_sync(account_name: &str, app_handle: &AppHandle) {
-    println!("[IDLE: {}] ⚡ RÉVEIL ! Nouveau message détecté. Lancement de mbsync...", account_name);
+async fn trigger_sync(account_name: &str, app_handle: &AppHandle) {
+    println!("[IDLE: {}] ⚡ Lancement de la synchronisation mbsync + notmuch...", account_name);
     
-    let sync_cmd = "sem --fg -j 1 --id mbsync '/usr/bin/mbsync -l '".to_owned() +  account_name + " ; sem -j 1 --fg --id notmuch '/usr/bin/notmuch new --quiet'";
+    let sync_cmd = "sem --fg -j 1 --id mbsync '/usr/bin/mbsync -a' ; sem -j 1 --fg --id notmuch '/usr/bin/notmuch new --quiet'";
     
     let status = Command::new("sh")
         .arg("-c")
         .arg(sync_cmd)
-        .status();
+        .status()
+        .await;
 
-    match status {
-        Ok(s) => {
-            if s.success() {
-                println!("[IDLE: {}] ✅ Synchronisation (mbsync + notmuch) terminée avec succès.", account_name);
-                if let Err(e) = app_handle.emit("mail-synced", account_name) {
-                    eprintln!("[IDLE: {}] ❌ Erreur lors de l'émission de l'événement Vue.js: {}", account_name, e);
-                } else {
-                    println!("[IDLE: {}] 📡 Événement 'mail-synced' envoyé à l'interface.", account_name);
-                }
-            } else {
-                eprintln!("[IDLE: {}] ❌ La commande de synchronisation a échoué avec le code: {:?}", account_name, s.code());
-            }
+    if let Ok(s) = status {
+        if s.success() {
+            println!("[IDLE: {}] ✅ Synchro terminée. Émission de l'événement Vue.js.", account_name);
+            let _ = app_handle.emit("mail-synced", account_name);
+        } else {
+            eprintln!("[IDLE: {}] ❌ Échec de la commande de synchronisation.", account_name);
         }
-        Err(e) => eprintln!("[IDLE: {}] ❌ Impossible de lancer la commande shell de synchro: {}", account_name, e),
     }
 }
 
-fn start_idle_worker(account: ImapAccount, app_handle: AppHandle) {
+// ---------------------------------------------------------
+// LE WORKER IDLE PRINCIPAL
+// ---------------------------------------------------------
+
+async fn start_idle_worker(account: ImapAccount, app_handle: AppHandle) {
     let acc_name = account.name.clone();
-    println!("[IDLE: {}] 🚀 Démarrage du worker IDLE...", acc_name);
+    println!("[IDLE: {}] 🚀 Démarrage du worker (Tokio Task) avec async-imap 0.11", acc_name);
 
     loop {
-        println!("[IDLE: {}] 🔄 Nouvelle boucle de connexion...", acc_name);
+        println!("[IDLE: {}] 🔄 Connexion en cours...", acc_name);
 
-        let password = match get_password(&account) {
+        let password = match get_password(&account).await {
             Ok(p) => p,
             Err(e) => {
-                eprintln!("[IDLE: {}] ❌ Échec mot de passe: {}. Pause 60s...", acc_name, e);
-                thread::sleep(Duration::from_secs(60));
+                eprintln!("[IDLE: {}] ❌ Erreur mdp: {}. Pause 60s.", acc_name, e);
+                time::sleep(Duration::from_secs(60)).await;
                 continue;
             }
         };
 
-        println!("[IDLE: {}] 🌐 Connexion TLS à {}:993...", acc_name, account.host);
-        let tls = native_tls::TlsConnector::builder().build().unwrap();
-        let client = match imap::connect((account.host.as_str(), 993), &account.host, &tls) {
-            Ok(c) => c,
-            Err(e) => {
-                eprintln!("[IDLE: {}] ❌ Échec de la connexion TCP/TLS: {:?}. Pause 30s...", acc_name, e);
-                thread::sleep(Duration::from_secs(30));
-                continue;
-            }
-        };
-
-        println!("[IDLE: {}] 🔐 Tentative de Login...", acc_name);
-        let mut session = match client.login(&account.user, &password) {
+        // =========================================================
+        // CONNEXION TCP + TLS (Séquence manuelle stricte)
+        // =========================================================
+        let imap_addr = (account.host.as_str(), 993);
+        
+        // 1. Établissement du tunnel TCP pur
+        println!("[IDLE: {}] 🌐 Connexion TCP à {}:993...", acc_name, account.host);
+        let tcp_stream = match TcpStream::connect(imap_addr).await {
             Ok(s) => s,
-            Err((e, _unauth_client)) => {
-                eprintln!("[IDLE: {}] ❌ Erreur de Login: {:?}. Pause 60s...", acc_name, e);
-                thread::sleep(Duration::from_secs(60));
+            Err(e) => {
+                eprintln!("[IDLE: {}] ❌ Erreur connexion TCP: {}. Pause 30s.", acc_name, e);
+                time::sleep(Duration::from_secs(30)).await;
                 continue;
             }
         };
 
-        // --- NOUVEAU : Vérification des capacités du serveur ---
-        println!("[IDLE: {}] 🛠️ Vérification du support IDLE par le serveur...", acc_name);
-        match session.capabilities() {
-            Ok(capabilities) => {
-                if !capabilities.has_str("IDLE") {
-                    eprintln!("[IDLE: {}] 🚨 ATTENTION : Ce serveur IMAP ne supporte PAS l'extension IDLE !", acc_name);
-                    for  cap in capabilities.iter(){
-                    eprintln!("[IDLE: {}] Capacités disponibles : {:?}", acc_name, cap);
-
-                    }
-                    // Si vous voyez ce message, vous ne POURREZ PAS utiliser IDLE pour ce compte.
-                    // Il faudra utiliser un système de "polling" (vérification toutes les X minutes).
-                } else {
-                    println!("[IDLE: {}] ✅ Le serveur supporte IDLE.", acc_name);
-                }
+        // 2. Négociation TLS par-dessus le tunnel TCP
+        println!("[IDLE: {}] 🔒 Négociation de la couche TLS...", acc_name);
+        let tls = async_native_tls::TlsConnector::new();
+        let tls_stream = match tls.connect(&account.host, tcp_stream).await {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("[IDLE: {}] ❌ Erreur handshake TLS: {}. Pause 30s.", acc_name, e);
+                time::sleep(Duration::from_secs(30)).await;
+                continue;
             }
-            Err(e) => eprintln!("[IDLE: {}] ⚠️ Impossible de lire les capacités du serveur: {:?}", acc_name, e),
-        }
+        };
 
-        println!("[IDLE: {}] 📂 Sélection de la boîte INBOX...", acc_name);
-        if let Err(e) = session.select("INBOX") {
-            eprintln!("[IDLE: {}] ❌ Erreur select INBOX: {:?}. Pause 30s...", acc_name, e);
-            let _ = session.logout();
-            thread::sleep(Duration::from_secs(30));
+        // 3. Création du client IMAP
+        let client = async_imap::Client::new(tls_stream);
+
+        // =========================================================
+        // LOGIN ET SÉLECTION DU DOSSIER
+        // =========================================================
+        println!("[IDLE: {}] 🔐 Tentative de Login...", acc_name);
+        let mut session = match client.login(&account.user, &password).await {
+            Ok(s) => {
+                println!("[IDLE: {}] ✅ Login réussi.", acc_name);
+                s
+            },
+            Err((e, _unauth_client)) => {
+                eprintln!("[IDLE: {}] ❌ Erreur Login: {}. Pause 60s.", acc_name, e);
+                time::sleep(Duration::from_secs(60)).await;
+                continue;
+            }
+        };
+
+        if let Err(e) = session.select("INBOX").await {
+            eprintln!("[IDLE: {}] ❌ Erreur sélection INBOX: {}. Pause 30s.", acc_name, e);
+            let _ = session.logout().await;
+            time::sleep(Duration::from_secs(30)).await;
             continue;
         }
 
-        println!("[IDLE: {}] 🎧 Passage en mode IDLE (Écoute continue)...", acc_name);
+        // =========================================================
+        // BOUCLE D'IDLE (Écoute continue)
+        // =========================================================
         loop {
-            // C'est ici que ça bloquait ou échouait pour vous.
-            match session.idle() {
-                Ok( idle) => {
-                    println!("[IDLE: {}] ⏳ En attente de notifications du serveur...", acc_name);
-                    
-                    match idle.wait_keepalive() {
-                        Ok(_) => {
-                            println!("[IDLE: {}] 🔔 Sortie de wait_keepalive() ! (Message, changement ou KeepAlive 29min)", acc_name);
-                            trigger_sync(&acc_name, &app_handle);
-                        }
-                        Err(e) => {
-                            eprintln!("[IDLE: {}] ❌ Erreur/Déconnexion pendant wait_keepalive: {:?}", acc_name, e);
-                            break; 
-                        }
-                    }
-                }
-                Err(e) => {
-                    // L'erreur exacte sera affichée ici grâce au `{:?}`
-                    eprintln!("[IDLE: {}] ❌ Impossible de passer en mode IDLE: {:?}", acc_name, e);
+            println!("[IDLE: {}] -- initializing idle", acc_name);
+            let mut idle = session.idle();
+            
+            if let Err(e) = idle.init().await {
+                eprintln!("[IDLE: {}] ❌ Erreur lors de l'initialisation IDLE: {}", acc_name, e);
+                break; // Force la reconnexion globale
+            }
+
+            println!("[IDLE: {}] -- idle async wait", acc_name);
+            let (idle_wait, _interrupt) = idle.wait();
+
+            // On englobe l'attente dans un timeout absolu (35 min) par sécurité réseau
+            let idle_result = match time::timeout(Duration::from_secs(35 * 60), idle_wait).await {
+                Ok(Ok(res)) => res,
+                Ok(Err(e)) => {
+                    eprintln!("[IDLE: {}] ❌ Erreur de flux pendant IDLE: {}", acc_name, e);
                     break;
+                }
+                Err(_) => {
+                    eprintln!("[IDLE: {}] ⏲️ Timeout réseau (35 min). Reconnexion TCP...", acc_name);
+                    break;
+                }
+            };
+
+            // Analyse de la réponse exacte de l'API
+            match idle_result {
+                ManualInterrupt => {
+                    println!("[IDLE: {}] -- IDLE manually interrupted", acc_name);
+                    session = match idle.done().await {
+                        Ok(s) => s,
+                        Err(_) => break,
+                    };
+                }
+                Timeout => {
+                    println!("[IDLE: {}] -- IDLE timed out (KeepAlive 29m). Envoi du DONE pour reset.", acc_name);
+                    session = match idle.done().await {
+                        Ok(s) => s,
+                        Err(e) => {
+                            eprintln!("[IDLE: {}] ❌ Erreur lors du DONE: {}", acc_name, e);
+                            break;
+                        }
+                    };
+                }
+                NewData(data) => {
+                    let s = String::from_utf8_lossy(data.borrow_owner());
+                    println!("[IDLE: {}] -- IDLE data reçue:\n{}", acc_name, s.trim());
+                    
+                    // ON SORT DE L'IDLE
+                    session = match idle.done().await {
+                        Ok(s) => s,
+                        Err(e) => {
+                            eprintln!("[IDLE: {}] ❌ Erreur lors du DONE après data: {}", acc_name, e);
+                            break;
+                        }
+                    };
+
+                    // ON SYNCHRONISE
+                    trigger_sync(&acc_name, &app_handle).await;
                 }
             }
         }
 
-        println!("[IDLE: {}] 🔌 Déconnexion propre de la session...", acc_name);
-        let _ = session.logout();
-        println!("[IDLE: {}] 💤 Pause 10s avant de relancer le cycle de reconnexion...", acc_name);
-        thread::sleep(Duration::from_secs(10));
+        println!("[IDLE: {}] -- logging out", acc_name);
+        // let _ = session.logout().await;
+        
+        println!("[IDLE: {}] 💤 Pause 10s avant reconnexion globale...", acc_name);
+        time::sleep(Duration::from_secs(10)).await;
     }
 }
+
+
+// ---------------------------------------------------------
+// POINT D'ENTRÉE TAUXI
+// ---------------------------------------------------------
+
 pub fn start_imap_idle_daemons(app_handle: AppHandle) {
     let accounts = parse_mbsyncrc();
-    println!("[IDLE-MANAGER] Démarrage des threads pour {} compte(s).", accounts.len());
+    println!("[IDLE-MANAGER] Lancement des tâches Tokio pour {} comptes.", accounts.len());
 
     for account in accounts {
         let handle_clone = app_handle.clone();
-        thread::spawn(move || {
-            start_idle_worker(account, handle_clone);
+        
+        tauri::async_runtime::spawn(async move {
+            start_idle_worker(account, handle_clone).await;
         });
     }
 }

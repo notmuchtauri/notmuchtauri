@@ -62,7 +62,6 @@ fn save_config(config: AppConfig) -> Result<(), String> {
             } else  {
                 for child in children.iter() {
                     root1.children.push(child.clone());
-
                 }
             }
         }

@@ -22,7 +22,6 @@ const mailPath= ref('');
 const folderTree = ref<FolderNode[]>([]);
 const isScanning = ref(false);
 
-const isMailRootExpanded = ref(false); // Collapsé par défaut
   const currentPage = ref(1)
   const pageSize = ref( 100); // Fixed page size
 const totalResults = ref(0);
